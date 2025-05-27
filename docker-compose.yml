@@ -1,0 +1,169 @@
+version: '3.8'
+
+services:
+  mariadb:
+    image: mariadb:10.6
+    container_name: culturallm_mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: culturallm
+      MYSQL_USER: culturallm_user
+      MYSQL_PASSWORD: culturallm_pass
+    ports:
+      - "3310:3306"  # Esternamente accessibile su 3310
+    volumes:
+      - culturallm_mariadb_data:/var/lib/mysql
+      - ./mariadb_init:/docker-entrypoint-initdb.d
+    networks:
+      - culturallm_network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root --password=rootpassword"]
+      interval: 2s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: always
+
+  db_init:
+    image: mariadb:10.6
+    container_name: culturallm_db_init
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: culturallm
+      MYSQL_USER: culturallm_user
+      MYSQL_PASSWORD: culturallm_pass
+    volumes:
+      - ./mariadb_init:/docker-entrypoint-initdb.d
+    networks:
+      - culturallm_network
+    command: >
+      sh -c '
+        echo "Verifico se il database è vuoto...";
+        while ! mysqladmin ping -h mariadb -u root --password=rootpassword --silent; do
+          sleep 1;
+        done;
+        COUNT=$$(mysql -h mariadb -u root --password=rootpassword -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '\''culturallm'\''");
+        if [ "$$COUNT" -eq 0 ]; then
+          echo "Database vuoto, inizializzazione...";
+          mysql -h mariadb -u root --password=rootpassword culturallm < /docker-entrypoint-initdb.d/init.sql;
+          echo "Database inizializzato con successo!";
+        else
+          echo "Database già contiene dati, salto l'\''inizializzazione.";
+        fi;
+        exit 0;
+      '
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: culturallm_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - culturallm_network
+    restart: always
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+
+  ollama_model_downloader:
+    image: ollama/ollama:latest
+    container_name: culturallm_ollama_downloader
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - culturallm_network
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: ["/bin/bash"]
+    command: >
+      -c "
+        echo 'Attendo che Ollama sia disponibile...';
+        until OLLAMA_HOST=http://ollama:11434 ollama list > /dev/null 2>&1; do
+          echo 'Ollama non ancora pronto, attendo...';
+          sleep 2;
+        done;
+        echo 'Ollama pronto, verifico se il modello esiste già...';
+        if OLLAMA_HOST=http://ollama:11434 ollama list | grep -q 'OLLAMA_MODEL=gemma3:1b'; then
+          echo 'Modello già presente, skip download.';
+        else
+          echo 'Scarico il modello vaiton/minerva:latest...';
+          OLLAMA_HOST=http://ollama:11434 ollama pull gemma3:1b;
+          echo 'Modello scaricato con successo!';
+        fi;
+        exit 0;
+      "
+
+  backend:
+    build:
+      context: ./backend
+    container_name: culturallm_backend
+    ports:
+      - "5001:5000"
+    depends_on:
+      db_init:
+        condition: service_completed_successfully
+      ollama_model_downloader:
+        condition: service_completed_successfully
+    environment:
+      - DATABASE_URL=mysql+pymysql://culturallm_user:culturallm_pass@mariadb:3306/culturallm
+      - OLLAMA_HOST=http://ollama:11434
+      - OLLAMA_MODEL=gemma3:1b
+      - PYTHONPATH=/app
+    networks:
+      - culturallm_network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
+      interval: 3s
+      timeout: 2s
+      retries: 5
+      start_period: 15s
+    restart: always
+    command: >
+      sh -c "
+        echo 'Verifico che il modello sia disponibile in Ollama...';
+        until curl -sf http://ollama:11434/api/tags | grep -q 'gemma3:1b'; do
+          echo 'In attesa del modello gemma3:1b...';
+          sleep 3;
+        done;
+        echo 'Modello disponibile! Avvio backend...';
+        cd /app && uvicorn backend.main:app --host 0.0.0.0 --port 5000 --reload
+      "
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: culturallm_frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    environment:
+      - REACT_APP_BACKEND_URL=http://localhost:5001
+    networks:
+      - culturallm_network
+    restart: always
+
+networks:
+  culturallm_network:
+    driver: bridge
+    name: culturallm_network
+
+volumes:
+  culturallm_mariadb_data:
+    name: culturallm_mariadb_data
+    driver: local
+  ollama_data:
+    name: culturallm_ollama_data
+    driver: local
