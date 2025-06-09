@@ -1,13 +1,38 @@
+# Framework principale per la creazione delle API REST
 fastapi==0.104.1
+
+# Server ASGI ad alte prestazioni per eseguire FastAPI
 uvicorn[standard]==0.24.0
+
+# ORM (Object-Relational Mapping) per interagire con il database
 sqlalchemy==2.0.23
+
+# Driver MySQL per Python, necessario per la connessione a MariaDB
 pymysql==1.1.0
+
+# Libreria per la crittografia, usata per la sicurezza
 cryptography==41.0.7
+
+# Gestione dei form multipart, necessario per upload file
 python-multipart==0.0.6
+
+# Gestione dei JWT (JSON Web Tokens) per l'autenticazione
 python-jose[cryptography]==3.3.0
+
+# Hashing delle password con bcrypt
 passlib[bcrypt]==1.7.4
+
+# Libreria HTTP per le chiamate API (usata per Ollama)
 requests==2.31.0
+
+# Validazione dei dati e serializzazione
 pydantic==2.5.0
+
+# Gestione delle variabili d'ambiente
 python-dotenv==1.0.0
+
+# Sistema di migrazione del database
 alembic==1.13.0
+
+# Validazione degli indirizzi email
 email-validator==2.1.0.post1

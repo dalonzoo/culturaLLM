@@ -1,22 +1,28 @@
+# Versione di Docker Compose - supporta tutte le funzionalità moderne come healthcheck e depends_on conditions
 version: '3.8'
 
 services:
+  # Database MariaDB - Gestisce la persistenza dei dati dell'applicazione
   mariadb:
     image: mariadb:10.6
     container_name: culturallm_mariadb
     environment:
+      # Credenziali e configurazione del database
       MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: culturallm
       MYSQL_USER: culturallm_user
       MYSQL_PASSWORD: culturallm_pass
     ports:
-      - "3310:3306"  # Esternamente accessibile su 3310
+      - "3310:3306"  # Porta esposta all'host per accesso diretto al DB se necessario
     volumes:
+      # Volume per la persistenza dei dati del database
       - culturallm_mariadb_data:/var/lib/mysql
+      # Mount per gli script di inizializzazione
       - ./mariadb_init:/docker-entrypoint-initdb.d
     networks:
       - culturallm_network
     healthcheck:
+      # Verifica che il database sia operativo e risponda alle query
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root --password=rootpassword"]
       interval: 2s
       timeout: 3s
@@ -24,13 +30,16 @@ services:
       start_period: 10s
     restart: always
 
+  # Servizio di inizializzazione del database - Esegue gli script di setup iniziale
   db_init:
     image: mariadb:10.6
     container_name: culturallm_db_init
     depends_on:
+      # Attende che MariaDB sia healthy prima di procedere
       mariadb:
         condition: service_healthy
     environment:
+      # Stesse credenziali del servizio principale per accesso
       MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: culturallm
       MYSQL_USER: culturallm_user
@@ -41,6 +50,7 @@ services:
       - culturallm_network
     command: >
       sh -c '
+        # Script che verifica se il database è vuoto e lo inizializza se necessario
         echo "Verifico se il database è vuoto...";
         while ! mysqladmin ping -h mariadb -u root --password=rootpassword --silent; do
           sleep 1;
@@ -56,27 +66,32 @@ services:
         exit 0;
       '
 
+  # Servizio Ollama - Gestisce il modello di linguaggio
   ollama:
     image: ollama/ollama:latest
     container_name: culturallm_ollama
     ports:
-      - "11434:11434"
+      - "11434:11434"  # Porta per le richieste API al modello
     volumes:
+      # Volume per la persistenza dei modelli scaricati
       - ollama_data:/root/.ollama
     networks:
       - culturallm_network
     restart: always
     healthcheck:
+      # Verifica che il servizio Ollama sia operativo
       test: ["CMD", "ollama", "list"]
       interval: 5s
       timeout: 3s
       retries: 5
       start_period: 30s
 
+  # Servizio per il download del modello - Assicura che il modello sia disponibile
   ollama_model_downloader:
     image: ollama/ollama:latest
     container_name: culturallm_ollama_downloader
     depends_on:
+      # Attende che Ollama sia operativo prima di scaricare il modello
       ollama:
         condition: service_healthy
     volumes:
@@ -88,41 +103,46 @@ services:
     entrypoint: ["/bin/bash"]
     command: >
       -c "
+        # Script che verifica la presenza del modello e lo scarica se necessario
         echo 'Attendo che Ollama sia disponibile...';
         until OLLAMA_HOST=http://ollama:11434 ollama list > /dev/null 2>&1; do
           echo 'Ollama non ancora pronto, attendo...';
           sleep 2;
         done;
         echo 'Ollama pronto, verifico se il modello esiste già...';
-        if OLLAMA_HOST=http://ollama:11434 ollama list | grep -q 'OLLAMA_MODEL=gemma3:1b'; then
+        if OLLAMA_HOST=http://ollama:11434 ollama list | grep -q 'gemma3:4b'; then
           echo 'Modello già presente, skip download.';
         else
-          echo 'Scarico il modello vaiton/minerva:latest...';
-          OLLAMA_HOST=http://ollama:11434 ollama pull gemma3:1b;
+          echo 'Scarico il modello gemma3:4b...';
+          OLLAMA_HOST=http://ollama:11434 ollama pull gemma3:4b;
           echo 'Modello scaricato con successo!';
         fi;
         exit 0;
       "
 
+  # Backend FastAPI - Gestisce la logica dell'applicazione
   backend:
     build:
       context: ./backend
     container_name: culturallm_backend
     ports:
-      - "5001:5000"
+      - "5001:5000"  # Porta esposta per le richieste API
     depends_on:
+      # Attende che database e modello siano pronti
       db_init:
         condition: service_completed_successfully
       ollama_model_downloader:
         condition: service_completed_successfully
     environment:
+      # Configurazione per connessione al database e al modello
       - DATABASE_URL=mysql+pymysql://culturallm_user:culturallm_pass@mariadb:3306/culturallm
       - OLLAMA_HOST=http://ollama:11434
-      - OLLAMA_MODEL=gemma3:1b
+      - OLLAMA_MODEL=gemma3:4b
       - PYTHONPATH=/app
     networks:
       - culturallm_network
     healthcheck:
+      # Verifica che il backend risponda alle richieste
       test: ["CMD-SHELL", "curl -f http://localhost:5000/health || exit 1"]
       interval: 3s
       timeout: 2s
@@ -131,22 +151,25 @@ services:
     restart: always
     command: >
       sh -c "
+        # Script che attende la disponibilità del modello prima di avviare il backend
         echo 'Verifico che il modello sia disponibile in Ollama...';
-        until curl -sf http://ollama:11434/api/tags | grep -q 'gemma3:1b'; do
-          echo 'In attesa del modello gemma3:1b...';
+        until curl -sf http://ollama:11434/api/tags | grep -q 'gemma3:4b'; do
+          echo 'In attesa del modello gemma3:4b...';
           sleep 3;
         done;
         echo 'Modello disponibile! Avvio backend...';
         cd /app && uvicorn backend.main:app --host 0.0.0.0 --port 5000 --reload
       "
 
+  # Frontend React - Interfaccia utente dell'applicazione
   frontend:
     build:
       context: ./frontend
     container_name: culturallm_frontend
     ports:
-      - "3000:3000"
+      - "3000:3000"  # Porta per accesso web
     depends_on:
+      # Attende che il backend sia operativo
       backend:
         condition: service_healthy
     environment:
@@ -155,15 +178,19 @@ services:
       - culturallm_network
     restart: always
 
+# Definizione della rete Docker per la comunicazione tra i servizi
 networks:
   culturallm_network:
     driver: bridge
     name: culturallm_network
 
+# Definizione dei volumi per la persistenza dei dati
 volumes:
+  # Volume per i dati del database
   culturallm_mariadb_data:
     name: culturallm_mariadb_data
     driver: local
+  # Volume per i modelli Ollama
   ollama_data:
     name: culturallm_ollama_data
     driver: local

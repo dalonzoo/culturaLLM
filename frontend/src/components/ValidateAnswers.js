@@ -7,11 +7,9 @@ function ValidateAnswers() {
   const [pendingAnswers, setPendingAnswers] = useState([])
   const [currentAnswerIndex, setCurrentAnswerIndex] = useState(0)
   const [validation, setValidation] = useState({
-    human_score: 5,
-    human_is_correct: true,
+    human_score: 5.5,
     human_feedback: "",
-    llm_score: 5,
-    llm_is_correct: true,
+    llm_score: 5.5,
     llm_feedback: "",
   })
   const [loading, setLoading] = useState(false)
@@ -43,6 +41,22 @@ function ValidateAnswers() {
     setLoading(false)
   }
 
+  const getQualitativeScore = (score) => {
+    if (score <= 2) return "Completamente sbagliata";
+    if (score <= 4) return "Insufficiente";
+    if (score <= 6) return "Parzialmente corretta";
+    if (score <= 8) return "Buona risposta";
+    return "Risposta eccellente";
+  }
+
+  const getScoreColor = (score) => {
+    if (score <= 2) return '#ff1a1a';
+    if (score <= 4) return '#ff4d4d';
+    if (score <= 6) return '#ffa64d';
+    if (score <= 8) return '#80cc33';
+    return '#4CAF50';
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSubmitting(true)
@@ -55,11 +69,11 @@ function ValidateAnswers() {
         throw new Error("ID risposta non valido")
       }
 
-      // Validate human answer
+      // Validate human answer - now using score to determine correctness
       await api.post("/api/validate/", {
         answer_id: currentAnswer.answer.id,
         score: Number.parseFloat(validation.human_score),
-        is_correct: validation.human_is_correct,
+        is_correct: Number.parseFloat(validation.human_score) >= 6,
         feedback: validation.human_feedback,
       })
 
@@ -68,7 +82,7 @@ function ValidateAnswers() {
         await api.post("/api/validate/", {
           answer_id: currentAnswer.llm_answer.id,
           score: Number.parseFloat(validation.llm_score),
-          is_correct: validation.llm_is_correct,
+          is_correct: Number.parseFloat(validation.llm_score) >= 6,
           feedback: validation.llm_feedback,
         })
       }
@@ -85,11 +99,9 @@ function ValidateAnswers() {
 
       // Reset validation form
       setValidation({
-        human_score: 5,
-        human_is_correct: true,
+        human_score: 5.5,
         human_feedback: "",
-        llm_score: 5,
-        llm_is_correct: true,
+        llm_score: 5.5,
         llm_feedback: "",
       })
 
@@ -109,11 +121,9 @@ function ValidateAnswers() {
       setCurrentAnswerIndex(0)
     }
     setValidation({
-      human_score: 5,
-      human_is_correct: true,
+      human_score: 5.5,
       human_feedback: "",
-      llm_score: 5,
-      llm_is_correct: true,
+      llm_score: 5.5,
       llm_feedback: "",
     })
     setError("")
@@ -190,45 +200,33 @@ function ValidateAnswers() {
           <div className="validation-section">
             <h3>Validazione Risposta Umana</h3>
             <div className="form-group">
-              <label>Questa risposta è corretta?</label>
-              <div className="radio-group">
-                <label className="radio-label">
-                  <input
-                    type="radio"
-                    name="human_is_correct"
-                    checked={validation.human_is_correct === true}
-                    onChange={() => setValidation({ ...validation, human_is_correct: true })}
-                    disabled={submitting}
-                  />
-                  ✅ Corretta
-                </label>
-                <label className="radio-label">
-                  <input
-                    type="radio"
-                    name="human_is_correct"
-                    checked={validation.human_is_correct === false}
-                    onChange={() => setValidation({ ...validation, human_is_correct: false })}
-                    disabled={submitting}
-                  />
-                  ❌ Incorretta
-                </label>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="human_score">Punteggio (1-10):</label>
-              <input
-                type="range"
-                id="human_score"
-                min="1"
-                max="10"
-                step="0.5"
-                value={validation.human_score}
-                onChange={(e) => setValidation({ ...validation, human_score: e.target.value })}
-                disabled={submitting}
-              />
-              <div className="score-display">
-                <span className="score-value">{validation.human_score}/10</span>
+              <label htmlFor="human_score">Valutazione:</label>
+              <div className="score-slider-container">
+                <input
+                  type="range"
+                  id="human_score"
+                  min="1"
+                  max="10"
+                  step="2.25"
+                  value={validation.human_score}
+                  onChange={(e) => setValidation({ ...validation, human_score: e.target.value })}
+                  disabled={submitting}
+                  className="score-slider"
+                  style={{
+                    background: `linear-gradient(to right, 
+                      ${getScoreColor(validation.human_score)} 
+                      ${(validation.human_score - 1) * 11.11}%, 
+                      #ddd ${(validation.human_score - 1) * 11.11}%)`
+                  }}
+                />
+                <div className="score-display">
+                  <div className={`validation-badge ${validation.human_score >= 6 ? 'correct' : 'incorrect'}`}
+                       style={{ backgroundColor: `${getScoreColor(validation.human_score)}20`,
+                               color: getScoreColor(validation.human_score),
+                               borderColor: `${getScoreColor(validation.human_score)}40` }}>
+                    {getQualitativeScore(validation.human_score)}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -249,45 +247,33 @@ function ValidateAnswers() {
             <div className="validation-section">
               <h3>Validazione Risposta IA</h3>
               <div className="form-group">
-                <label>Questa risposta è corretta?</label>
-                <div className="radio-group">
-                  <label className="radio-label">
-                    <input
-                      type="radio"
-                      name="llm_is_correct"
-                      checked={validation.llm_is_correct === true}
-                      onChange={() => setValidation({ ...validation, llm_is_correct: true })}
-                      disabled={submitting}
-                    />
-                    ✅ Corretta
-                  </label>
-                  <label className="radio-label">
-                    <input
-                      type="radio"
-                      name="llm_is_correct"
-                      checked={validation.llm_is_correct === false}
-                      onChange={() => setValidation({ ...validation, llm_is_correct: false })}
-                      disabled={submitting}
-                    />
-                    ❌ Incorretta
-                  </label>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="llm_score">Punteggio (1-10):</label>
-                <input
-                  type="range"
-                  id="llm_score"
-                  min="1"
-                  max="10"
-                  step="0.5"
-                  value={validation.llm_score}
-                  onChange={(e) => setValidation({ ...validation, llm_score: e.target.value })}
-                  disabled={submitting}
-                />
-                <div className="score-display">
-                  <span className="score-value">{validation.llm_score}/10</span>
+                <label htmlFor="llm_score">Valutazione:</label>
+                <div className="score-slider-container">
+                  <input
+                    type="range"
+                    id="llm_score"
+                    min="1"
+                    max="10"
+                    step="2.25"
+                    value={validation.llm_score}
+                    onChange={(e) => setValidation({ ...validation, llm_score: e.target.value })}
+                    disabled={submitting}
+                    className="score-slider"
+                    style={{
+                      background: `linear-gradient(to right, 
+                        ${getScoreColor(validation.llm_score)} 
+                        ${(validation.llm_score - 1) * 11.11}%, 
+                        #ddd ${(validation.llm_score - 1) * 11.11}%)`
+                    }}
+                  />
+                  <div className="score-display">
+                    <div className={`validation-badge ${validation.llm_score >= 6 ? 'correct' : 'incorrect'}`}
+                         style={{ backgroundColor: `${getScoreColor(validation.llm_score)}20`,
+                                 color: getScoreColor(validation.llm_score),
+                                 borderColor: `${getScoreColor(validation.llm_score)}40` }}>
+                      {getQualitativeScore(validation.llm_score)}
+                    </div>
+                  </div>
                 </div>
               </div>
 
