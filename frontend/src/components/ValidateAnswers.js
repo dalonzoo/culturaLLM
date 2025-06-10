@@ -3,6 +3,15 @@
 import { useState, useEffect } from "react"
 import api from "../services/api"
 
+function formatLLMText(text) {
+  if (!text) return '';
+  // Sostituisci **testo** con <b>testo</b>
+  let formatted = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+  // Sostituisci \n con <br/>
+  formatted = formatted.replace(/\n/g, '<br/>');
+  return formatted;
+}
+
 function ValidateAnswers() {
   const [pendingAnswers, setPendingAnswers] = useState([])
   const [currentAnswerIndex, setCurrentAnswerIndex] = useState(0)
@@ -170,7 +179,7 @@ function ValidateAnswers() {
           </div>
 
           <div className="answer-section">
-            <h3>Risposta da validare:</h3>
+            <h3>Risposta Utente:</h3>
             <div className="answer-content">
               <p>{currentAnswer.answer.text}</p>
               <div className="answer-meta">
@@ -181,116 +190,121 @@ function ValidateAnswers() {
                 )}
               </div>
             </div>
+            {/* Validazione risposta umana */}
+            <div className="validation-form">
+              <div className="validation-section">
+                <h3>Validazione Risposta Umana</h3>
+                <div className="form-group">
+                  <label htmlFor="human_score">Valutazione:</label>
+                  <div className="score-slider-container">
+                    <input
+                      type="range"
+                      id="human_score"
+                      min="1"
+                      max="10"
+                      step="2.25"
+                      value={validation.human_score}
+                      onChange={(e) => setValidation({ ...validation, human_score: e.target.value })}
+                      disabled={submitting}
+                      className="score-slider"
+                      style={{
+                        background: `linear-gradient(to right, 
+                          ${getScoreColor(validation.human_score)} 
+                          ${(validation.human_score - 1) * 11.11}%, 
+                          #ddd ${(validation.human_score - 1) * 11.11}%)`
+                      }}
+                    />
+                    <div className="score-display">
+                      <div className={`validation-badge ${validation.human_score >= 6 ? 'correct' : 'incorrect'}`}
+                           style={{ backgroundColor: `${getScoreColor(validation.human_score)}20`,
+                                   color: getScoreColor(validation.human_score),
+                                   borderColor: `${getScoreColor(validation.human_score)}40` }}>
+                        {getQualitativeScore(validation.human_score)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label htmlFor="human_feedback">Feedback (opzionale):</label>
+                  <textarea
+                    id="human_feedback"
+                    value={validation.human_feedback}
+                    onChange={(e) => setValidation({ ...validation, human_feedback: e.target.value })}
+                    placeholder="Aggiungi un commento sulla risposta umana..."
+                    rows="3"
+                    disabled={submitting}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           {currentAnswer.llm_answer && (
             <div className="llm-answer-section">
               <h3>Risposta IA:</h3>
               <div className="answer-content">
-                <p>{currentAnswer.llm_answer.text}</p>
+                <div
+                  dangerouslySetInnerHTML={{
+                    __html: formatLLMText(currentAnswer.llm_answer.text),
+                  }}
+                />
                 <div className="answer-meta">
                   <span className="llm-badge">🤖 Risposta IA</span>
+                </div>
+              </div>
+              {/* Validazione risposta IA */}
+              <div className="validation-form">
+                <div className="validation-section">
+                  <h3>Validazione Risposta IA</h3>
+                  <div className="form-group">
+                    <label htmlFor="llm_score">Valutazione:</label>
+                    <div className="score-slider-container">
+                      <input
+                        type="range"
+                        id="llm_score"
+                        min="1"
+                        max="10"
+                        step="2.25"
+                        value={validation.llm_score}
+                        onChange={(e) => setValidation({ ...validation, llm_score: e.target.value })}
+                        disabled={submitting}
+                        className="score-slider"
+                        style={{
+                          background: `linear-gradient(to right, 
+                            ${getScoreColor(validation.llm_score)} 
+                            ${(validation.llm_score - 1) * 11.11}%, 
+                            #ddd ${(validation.llm_score - 1) * 11.11}%)`
+                        }}
+                      />
+                      <div className="score-display">
+                        <div className={`validation-badge ${validation.llm_score >= 6 ? 'correct' : 'incorrect'}`}
+                             style={{ backgroundColor: `${getScoreColor(validation.llm_score)}20`,
+                                     color: getScoreColor(validation.llm_score),
+                                     borderColor: `${getScoreColor(validation.llm_score)}40` }}>
+                          {getQualitativeScore(validation.llm_score)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="llm_feedback">Feedback (opzionale):</label>
+                    <textarea
+                      id="llm_feedback"
+                      value={validation.llm_feedback}
+                      onChange={(e) => setValidation({ ...validation, llm_feedback: e.target.value })}
+                      placeholder="Aggiungi un commento sulla risposta IA..."
+                      rows="3"
+                      disabled={submitting}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
           )}
         </div>
-
         <form onSubmit={handleSubmit} className="validation-form">
-          <div className="validation-section">
-            <h3>Validazione Risposta Umana</h3>
-            <div className="form-group">
-              <label htmlFor="human_score">Valutazione:</label>
-              <div className="score-slider-container">
-                <input
-                  type="range"
-                  id="human_score"
-                  min="1"
-                  max="10"
-                  step="2.25"
-                  value={validation.human_score}
-                  onChange={(e) => setValidation({ ...validation, human_score: e.target.value })}
-                  disabled={submitting}
-                  className="score-slider"
-                  style={{
-                    background: `linear-gradient(to right, 
-                      ${getScoreColor(validation.human_score)} 
-                      ${(validation.human_score - 1) * 11.11}%, 
-                      #ddd ${(validation.human_score - 1) * 11.11}%)`
-                  }}
-                />
-                <div className="score-display">
-                  <div className={`validation-badge ${validation.human_score >= 6 ? 'correct' : 'incorrect'}`}
-                       style={{ backgroundColor: `${getScoreColor(validation.human_score)}20`,
-                               color: getScoreColor(validation.human_score),
-                               borderColor: `${getScoreColor(validation.human_score)}40` }}>
-                    {getQualitativeScore(validation.human_score)}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="human_feedback">Feedback (opzionale):</label>
-              <textarea
-                id="human_feedback"
-                value={validation.human_feedback}
-                onChange={(e) => setValidation({ ...validation, human_feedback: e.target.value })}
-                placeholder="Aggiungi un commento sulla risposta umana..."
-                rows="3"
-                disabled={submitting}
-              />
-            </div>
-          </div>
-
-          {currentAnswer.llm_answer && (
-            <div className="validation-section">
-              <h3>Validazione Risposta IA</h3>
-              <div className="form-group">
-                <label htmlFor="llm_score">Valutazione:</label>
-                <div className="score-slider-container">
-                  <input
-                    type="range"
-                    id="llm_score"
-                    min="1"
-                    max="10"
-                    step="2.25"
-                    value={validation.llm_score}
-                    onChange={(e) => setValidation({ ...validation, llm_score: e.target.value })}
-                    disabled={submitting}
-                    className="score-slider"
-                    style={{
-                      background: `linear-gradient(to right, 
-                        ${getScoreColor(validation.llm_score)} 
-                        ${(validation.llm_score - 1) * 11.11}%, 
-                        #ddd ${(validation.llm_score - 1) * 11.11}%)`
-                    }}
-                  />
-                  <div className="score-display">
-                    <div className={`validation-badge ${validation.llm_score >= 6 ? 'correct' : 'incorrect'}`}
-                         style={{ backgroundColor: `${getScoreColor(validation.llm_score)}20`,
-                                 color: getScoreColor(validation.llm_score),
-                                 borderColor: `${getScoreColor(validation.llm_score)}40` }}>
-                      {getQualitativeScore(validation.llm_score)}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="llm_feedback">Feedback (opzionale):</label>
-                <textarea
-                  id="llm_feedback"
-                  value={validation.llm_feedback}
-                  onChange={(e) => setValidation({ ...validation, llm_feedback: e.target.value })}
-                  placeholder="Aggiungi un commento sulla risposta IA..."
-                  rows="3"
-                  disabled={submitting}
-                />
-              </div>
-            </div>
-          )}
-
           <div className="form-actions">
             <button type="button" onClick={handleSkip} className="btn btn-outline" disabled={submitting}>
               Salta
@@ -300,7 +314,6 @@ function ValidateAnswers() {
             </button>
           </div>
         </form>
-
         <div className="progress-bar">
           <div
             className="progress-fill"

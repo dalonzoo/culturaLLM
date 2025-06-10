@@ -58,10 +58,10 @@ class LLMService:
                         "temperature": 0.7,    # Controllo della creatività (0.0-1.0)
                         "top_p": 0.9,          # Sampling per varietà nelle risposte
                         "max_tokens": 200,      # Lunghezza massima della risposta
-                        "stop": ["\n\n"]       # Ferma la generazione ai doppi newline
+                        #"stop": ["\n\n"]       # Ferma la generazione ai doppi newline
                     }
                 },
-                timeout=60,  # Timeout della richiesta in secondi
+                timeout=120,  # Timeout della richiesta in secondi
             )
             response.raise_for_status()  # Solleva eccezione per errori HTTP
             

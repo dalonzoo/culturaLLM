@@ -28,7 +28,7 @@ body {
 
 /* Navbar Styles */
 .navbar {
-  background: linear-gradient(135deg, #2c5530, #4a7c59);
+  background: linear-gradient(135deg, #822433, #6d1e2a);
   color: white;
   padding: 1rem 0;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -107,13 +107,13 @@ body {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #2c5530, #4a7c59);
+  background: linear-gradient(135deg, #822433, #b03a4b);
   color: white;
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(44, 85, 48, 0.3);
+  box-shadow: 0 4px 8px rgba(130, 36, 51, 0.3);
 }
 
 .btn-secondary {
@@ -128,12 +128,12 @@ body {
 
 .btn-outline {
   background: transparent;
-  color: #2c5530;
-  border: 2px solid #2c5530;
+  color: #822433;
+  border: 2px solid #822433;
 }
 
 .btn-outline:hover {
-  background: #2c5530;
+  background: #822433;
   color: white;
 }
 
@@ -168,7 +168,7 @@ body {
 .auth-card h2 {
   text-align: center;
   margin-bottom: 2rem;
-  color: #2c5530;
+  color: #822433;
 }
 
 .auth-form {
@@ -202,7 +202,6 @@ body {
 .form-group textarea:focus,
 .form-group select:focus {
   outline: none;
-  border-color: #2c5530;
 }
 
 .auth-link {
@@ -211,7 +210,7 @@ body {
 }
 
 .auth-link a {
-  color: #2c5530;
+  color: #822433;
   text-decoration: none;
   font-weight: 500;
 }
@@ -228,7 +227,7 @@ body {
 
 .dashboard-header h1 {
   font-size: 2.5rem;
-  color: #2c5530;
+  color: #822433;
   margin-bottom: 1rem;
 }
 
@@ -257,7 +256,7 @@ body {
 .stat-value {
   font-size: 2rem;
   font-weight: bold;
-  color: #2c5530;
+  color: #822433;
 }
 
 .badges {
@@ -302,7 +301,7 @@ body {
 }
 
 .action-card h3 {
-  color: #2c5530;
+  color: #822433;
   margin-bottom: 1rem;
   font-size: 1.3rem;
 }
@@ -321,7 +320,7 @@ body {
 
 .game-flow h2 {
   text-align: center;
-  color: #2c5530;
+  color: #822433;
   margin-bottom: 2rem;
 }
 
@@ -341,7 +340,7 @@ body {
 .step-number {
   width: 40px;
   height: 40px;
-  background: linear-gradient(135deg, #2c5530, #4a7c59);
+  background: linear-gradient(135deg, #822433, #b03a4b);
   color: white;
   border-radius: 50%;
   display: flex;
@@ -352,7 +351,7 @@ body {
 }
 
 .flow-step h4 {
-  color: #2c5530;
+  color: #822433;
   margin-bottom: 0.5rem;
 }
 
@@ -368,7 +367,7 @@ body {
 }
 
 .page-header h1 {
-  color: #2c5530;
+  color: #822433;
   font-size: 2rem;
   margin-bottom: 0.5rem;
 }
@@ -413,7 +412,7 @@ body {
 }
 
 .tips h3 {
-  color: #2c5530;
+  color: #822433;
   margin-bottom: 1rem;
 }
 
@@ -456,7 +455,7 @@ body {
 }
 
 .question-text {
-  color: #2c5530;
+  color: #822433;
   font-size: 1.3rem;
   margin-bottom: 1.5rem;
   line-height: 1.5;
@@ -516,22 +515,27 @@ body {
 .score-value {
   font-size: 1.2rem;
   font-weight: bold;
-  color: #2c5530;
+  color: #822433;
 }
 
 .progress-bar {
   width: 100%;
-  height: 8px;
+  height: 12px;
   background: #e1e5e9;
-  border-radius: 4px;
+  border-radius: 24px;
   overflow: hidden;
   margin-top: 2rem;
+  position: relative;
 }
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(135deg, #2c5530, #4a7c59);
+  background: linear-gradient(135deg, #822433, #b03a4b);
   transition: width 0.3s ease;
+  border-radius: 24px;
+  position: absolute;
+  left: 0;
+  top: 0;
 }
 
 /* Leaderboard Styles */
@@ -560,8 +564,8 @@ body {
 }
 
 .leaderboard-item.current-user {
-  background: linear-gradient(135deg, rgba(44, 85, 48, 0.1), rgba(74, 124, 89, 0.1));
-  border-left: 4px solid #2c5530;
+  background: linear-gradient(135deg, rgba(130, 36, 51, 0.1), rgba(176, 58, 75, 0.1));
+  border-left: 4px solid #822433;
 }
 
 .leaderboard-item:last-child {
@@ -583,7 +587,7 @@ body {
 }
 
 .username {
-  color: #2c5530;
+  color: #822433;
   margin-bottom: 0.5rem;
   display: flex;
   align-items: center;
@@ -607,7 +611,7 @@ body {
 .score-value {
   font-size: 1.5rem;
   font-weight: bold;
-  color: #2c5530;
+  color: #822433;
   display: block;
 }
 
@@ -625,7 +629,7 @@ body {
 }
 
 .user-stats-summary h3 {
-  color: #2c5530;
+  color: #822433;
   margin-bottom: 1rem;
   text-align: center;
 }
@@ -653,7 +657,7 @@ body {
 .stat-value {
   font-size: 1.5rem;
   font-weight: bold;
-  color: #2c5530;
+  color: #822433;
 }
 
 /* Message Styles */
@@ -689,7 +693,7 @@ body {
 }
 
 .no-content h2 {
-  color: #2c5530;
+  color: #822433;
   margin-bottom: 1rem;
 }
 
@@ -779,7 +783,7 @@ body {
 }
 
 .validation-section h3 {
-  color: #2c5530;
+  color: #822433;
   margin-bottom: 1rem;
   font-size: 1.2rem;
 }
@@ -815,8 +819,8 @@ body {
 
 .validation-section textarea:focus {
   outline: none;
-  border-color: #2c5530;
-  box-shadow: 0 0 0 2px rgba(44, 85, 48, 0.1);
+  border-color: #822433;
+  box-shadow: 0 0 0 2px rgba(130, 36, 51, 0.1);
 }
 
 .score-slider-container {
@@ -828,7 +832,7 @@ body {
   -webkit-appearance: none;
   width: 100%;
   height: 8px;
-  border-radius: 4px;
+  border-radius: 18px !important;
   outline: none;
   transition: background 0.2s ease;
 }
@@ -839,8 +843,8 @@ body {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: #ffffff;
-  border: 2px solid currentColor;
+  background: #ffffffbb;
+  border: 2px solid #e1e5e9;
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -854,8 +858,8 @@ body {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: #ffffff;
-  border: 2px solid currentColor;
+  background: #ffffffbb;
+  border: 2px solid #e1e5e9;
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
