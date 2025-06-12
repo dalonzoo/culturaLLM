@@ -4,6 +4,23 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import api from "../services/api"
 
+const getErrorMessage = (error, defaultMessage) => {
+  if (error.response && error.response.data && error.response.data.detail) {
+    const { detail } = error.response.data
+    if (typeof detail === "string") {
+      return detail
+    }
+    if (Array.isArray(detail)) {
+      // Handle FastAPI validation errors
+      return detail.map((err) => `${err.loc.join(" -> ")}: ${err.msg}`).join("; ")
+    }
+  }
+  if (error.message) {
+    return error.message
+  }
+  return defaultMessage
+}
+
 function CreateQuestion() {
   const [formData, setFormData] = useState({
     text: "",
@@ -13,6 +30,7 @@ function CreateQuestion() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [generatingAIQuestion, setGeneratingAIQuestion] = useState(false)
 
   const navigate = useNavigate()
 
@@ -25,7 +43,7 @@ function CreateQuestion() {
       const response = await api.get("/api/questions/themes")
       setThemes(response.data)
     } catch (error) {
-      setError("Errore nel caricamento dei temi")
+      setError(getErrorMessage(error, "Errore nel caricamento dei temi"))
     }
   }
 
@@ -53,10 +71,35 @@ function CreateQuestion() {
         navigate("/")
       }, 2000)
     } catch (error) {
-      setError(error.response?.data?.detail || "Errore nella creazione della domanda")
+      setError(getErrorMessage(error, "Errore nella creazione della domanda"))
     }
 
     setLoading(false)
+  }
+
+  const handleGenerateAIQuestion = async () => {
+    if (!formData.theme_id) {
+      setError("Seleziona prima un tema per generare una domanda")
+      return
+    }
+
+    setGeneratingAIQuestion(true)
+    setError("")
+
+    try {
+      const response = await api.post("/api/questions/generate", {
+        theme_id: Number(formData.theme_id),
+      })
+      
+      setFormData(prev => ({
+        ...prev,
+        text: response.data.text
+      }))
+    } catch (error) {
+      setError(getErrorMessage(error, "Errore nella generazione della domanda"))
+    }
+
+    setGeneratingAIQuestion(false)
   }
 
   return (
@@ -97,16 +140,26 @@ function CreateQuestion() {
 
           <div className="form-group">
             <label htmlFor="text">Testo della Domanda</label>
-            <textarea
-              id="text"
-              name="text"
-              value={formData.text}
-              onChange={handleChange}
-              placeholder="Scrivi una domanda specifica sulla cultura italiana..."
-              rows="4"
-              required
-              disabled={loading}
-            />
+            <div className="textarea-with-button">
+              <textarea
+                id="text"
+                name="text"
+                value={formData.text}
+                onChange={handleChange}
+                placeholder="Scrivi una domanda specifica sulla cultura italiana..."
+                rows="4"
+                required
+                disabled={loading || generatingAIQuestion}
+              />
+              <button
+                type="button"
+                onClick={handleGenerateAIQuestion}
+                className="btn btn-ai"
+                disabled={loading || generatingAIQuestion || !formData.theme_id}
+              >
+                {generatingAIQuestion ? "Generazione..." : "🤖 Genera con AI"}
+              </button>
+            </div>
             <small className="form-hint">
               Esempi: "Qual è il gesto italiano per dire 'delizioso'?", "Quale programma TV italiano era famoso negli
               anni '80?"

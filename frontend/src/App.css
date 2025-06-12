@@ -446,12 +446,14 @@ body {
 }
 
 .theme-badge {
-  background: linear-gradient(135deg, #17a2b8, #138496);
-  color: white;
-  padding: 0.5rem 1rem;
-  border-radius: 20px;
-  font-size: 0.9rem;
+  background: rgba(23, 162, 184, 0.1);
+  color: #17a2b8;
+  padding: 0.35rem 0.8rem;
+  border-radius: 16px;
+  font-size: 0.85rem;
   font-weight: 500;
+  border: 1px solid rgba(23, 162, 184, 0.2);
+  backdrop-filter: blur(4px);
 }
 
 .question-text {
@@ -909,4 +911,85 @@ body {
   background-color: rgba(255, 77, 77, 0.1);
   color: #ff4d4d;
   border: 1px solid rgba(255, 77, 77, 0.2);
+}
+
+/* Styles for AI question generation */
+.textarea-with-button {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.textarea-with-button textarea {
+  flex: 1;
+}
+
+.btn-ai {
+  background-color: #6366f1 !important;
+  color: white !important;
+  border: none !important;
+  padding: 8px 16px !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  transition: background-color 0.2s ease !important;
+  white-space: nowrap !important;
+}
+
+.btn-ai:hover:not(:disabled) {
+  background-color: #4f46e5 !important;
+}
+
+.btn-ai:disabled {
+  background-color: #a5a6f6 !important;
+  cursor: not-allowed !important;
+}
+
+/* Styles for answer validation */
+.validation-result {
+  margin: 20px 0;
+  padding: 15px;
+  border-radius: 8px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.validation-result.correct {
+  background-color: #f0fdf4;
+  border-color: #86efac;
+}
+
+.validation-result.incorrect {
+  background-color: #fef2f2;
+  border-color: #fecaca;
+}
+
+.validation-result h3 {
+  margin: 0 0 10px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.validation-result .ai-feedback {
+  margin: 10px 0;
+  line-height: 1.5;
+  color: #4b5563;
+}
+
+.validation-result .correct-answer {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.validation-result .correct-answer strong {
+  display: block;
+  margin-bottom: 5px;
+  color: #374151;
+}
+
+.validation-result .correct-answer p {
+  margin: 0;
+  color: #059669;
+  font-style: italic;
 }
