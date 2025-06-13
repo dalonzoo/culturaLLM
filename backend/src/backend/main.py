@@ -19,7 +19,7 @@ import os
 from backend.services.database import get_db, engine, Base
 
 # Importazione di tutti i router dell'applicazione
-from backend.routers import auth, question, answer, validate, leaderboard, cultural_questions
+from backend.routers import auth, question, answer, validate, leaderboard
 
 # Importazione degli schemi Pydantic per la validazione dei dati
 from backend.models.schemas import UserCreate, UserLogin, Token
@@ -50,7 +50,6 @@ app.include_router(question.router, prefix="/api/questions", tags=["questions"])
 app.include_router(answer.router, prefix="/api/answers", tags=["answers"])         # Gestione risposte
 app.include_router(validate.router, prefix="/api/validate", tags=["validate"])     # Gestione validazioni
 app.include_router(leaderboard.router, prefix="/api/leaderboard", tags=["leaderboard"]) # Gestione classifica
-app.include_router(cultural_questions.router)  # Il prefisso è già definito nel router
 
 # Endpoint per il controllo dello stato dell'API
 # Utilizzato per healthcheck e monitoraggio

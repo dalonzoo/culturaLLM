@@ -2,21 +2,17 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List
 import random
-from pydantic import BaseModel
 
 from backend.services.database import get_db
 from backend.services.llm_service import llm_service
 from backend.models.schemas import (
-    Question, CulturalTheme, User,
+    Question, CulturalTheme, User, CulturalQuestion,
     QuestionCreate, QuestionResponse, CulturalThemeResponse,
     Answer
 )
 from backend.routers.auth import get_current_user
 
 router = APIRouter()
-
-class GenerateQuestionPayload(BaseModel):
-    theme_id: int
 
 async def generate_llm_answer_background(question_id: int, db: Session):
     """Background task to generate LLM answer"""
@@ -111,44 +107,19 @@ async def get_pending_questions_for_answer(
         Answer.user_id == current_user.id
     ).subquery()
     
-    # Get questions that need answers
-    questions = db.query(Question).filter(
-        Question.creator_id != current_user.id,  # Not user's own questions
-        Question.is_active == True,  # Only active questions
-        ~Question.id.in_(answered_questions)  # Not already answered by user
+    # Get questions that need answers from cultural_questions table
+    questions = db.query(CulturalQuestion).filter(
+        ~CulturalQuestion.id.in_(answered_questions)  # Not already answered by user
     ).limit(10).all()
     
-    return questions
-
-@router.post("/generate", response_model=QuestionResponse)
-async def generate_question(
-    payload: GenerateQuestionPayload,
-    background_tasks: BackgroundTasks,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Genera una domanda usando l'AI basata sul tema selezionato
-    """
-    # Verifica che il tema esista
-    theme = db.query(CulturalTheme).filter(CulturalTheme.id == payload.theme_id).first()
-    if not theme:
-        raise HTTPException(status_code=404, detail="Theme not found")
-    
-    # Genera la domanda usando il servizio LLM
-    question_text = llm_service.generate_question(theme.name, theme.description)
-    
-    # Crea la domanda nel database
-    db_question = Question(
-        text=question_text,
-        creator_id=current_user.id,
-        theme_id=payload.theme_id
-    )
-    db.add(db_question)
-    db.commit()
-    db.refresh(db_question)
-    
-    # Genera la risposta AI in background
-    background_tasks.add_task(generate_llm_answer_background, db_question.id, db)
-    
-    return QuestionResponse.from_orm(db_question)
+    # Convert CulturalQuestion to QuestionResponse format
+    return [
+        QuestionResponse(
+            id=question.id,
+            text=question.question,
+            theme_id=None,  # Cultural questions don't have themes
+            creator_id=None,  # Cultural questions don't have creators
+            is_active=True
+        )
+        for question in questions
+    ]

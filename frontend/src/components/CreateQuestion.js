@@ -4,23 +4,6 @@ import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import api from "../services/api"
 
-const getErrorMessage = (error, defaultMessage) => {
-  if (error.response && error.response.data && error.response.data.detail) {
-    const { detail } = error.response.data
-    if (typeof detail === "string") {
-      return detail
-    }
-    if (Array.isArray(detail)) {
-      // Handle FastAPI validation errors
-      return detail.map((err) => `${err.loc.join(" -> ")}: ${err.msg}`).join("; ")
-    }
-  }
-  if (error.message) {
-    return error.message
-  }
-  return defaultMessage
-}
-
 function CreateQuestion() {
   const [formData, setFormData] = useState({
     text: "",
@@ -30,7 +13,7 @@ function CreateQuestion() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-  const [generatingAIQuestion, setGeneratingAIQuestion] = useState(false)
+  const [generatingLLM, setGeneratingLLM] = useState(false)
 
   const navigate = useNavigate()
 
@@ -43,8 +26,36 @@ function CreateQuestion() {
       const response = await api.get("/api/questions/themes")
       setThemes(response.data)
     } catch (error) {
-      setError(getErrorMessage(error, "Errore nel caricamento dei temi"))
+      setError("Errore nel caricamento dei temi")
     }
+  }
+
+  const handleGenerateLLMQuestion = async () => {
+    if (!formData.theme_id) {
+      setError("Seleziona prima un tema")
+      return
+    }
+
+    setGeneratingLLM(true)
+    setError("")
+    setSuccess("")
+
+    try {
+      const theme = themes.find(t => t.id === Number.parseInt(formData.theme_id))
+      const response = await api.post("/api/cultural-questions/generate", {
+        topic: theme.name
+      })
+
+      setFormData({
+        ...formData,
+        text: response.data.question
+      })
+      setSuccess("Domanda generata con successo!")
+    } catch (error) {
+      setError(error.response?.data?.detail || "Errore nella generazione della domanda")
+    }
+
+    setGeneratingLLM(false)
   }
 
   const handleChange = (e) => {
@@ -71,35 +82,10 @@ function CreateQuestion() {
         navigate("/")
       }, 2000)
     } catch (error) {
-      setError(getErrorMessage(error, "Errore nella creazione della domanda"))
+      setError(error.response?.data?.detail || "Errore nella creazione della domanda")
     }
 
     setLoading(false)
-  }
-
-  const handleGenerateAIQuestion = async () => {
-    if (!formData.theme_id) {
-      setError("Seleziona prima un tema per generare una domanda")
-      return
-    }
-
-    setGeneratingAIQuestion(true)
-    setError("")
-
-    try {
-      const response = await api.post("/api/questions/generate", {
-        theme_id: Number(formData.theme_id),
-      })
-      
-      setFormData(prev => ({
-        ...prev,
-        text: response.data.text
-      }))
-    } catch (error) {
-      setError(getErrorMessage(error, "Errore nella generazione della domanda"))
-    }
-
-    setGeneratingAIQuestion(false)
   }
 
   return (
@@ -122,7 +108,7 @@ function CreateQuestion() {
               value={formData.theme_id}
               onChange={handleChange}
               required
-              disabled={loading}
+              disabled={loading || generatingLLM}
             >
               <option value="">Seleziona un tema</option>
               {themes.map((theme) => (
@@ -132,34 +118,34 @@ function CreateQuestion() {
               ))}
             </select>
             {formData.theme_id && (
-              <small className="theme-description">
-                {themes.find((t) => t.id === Number.parseInt(formData.theme_id))?.description}
-              </small>
+              <div className="theme-actions">
+                <small className="theme-description">
+                  {themes.find((t) => t.id === Number.parseInt(formData.theme_id))?.description}
+                </small>
+                <button
+                  type="button"
+                  onClick={handleGenerateLLMQuestion}
+                  className="btn btn-secondary btn-sm"
+                  disabled={generatingLLM}
+                >
+                  {generatingLLM ? "Generazione in corso..." : "Genera con AI"}
+                </button>
+              </div>
             )}
           </div>
 
           <div className="form-group">
             <label htmlFor="text">Testo della Domanda</label>
-            <div className="textarea-with-button">
-              <textarea
-                id="text"
-                name="text"
-                value={formData.text}
-                onChange={handleChange}
-                placeholder="Scrivi una domanda specifica sulla cultura italiana..."
-                rows="4"
-                required
-                disabled={loading || generatingAIQuestion}
-              />
-              <button
-                type="button"
-                onClick={handleGenerateAIQuestion}
-                className="btn btn-ai"
-                disabled={loading || generatingAIQuestion || !formData.theme_id}
-              >
-                {generatingAIQuestion ? "Generazione..." : "🤖 Genera con AI"}
-              </button>
-            </div>
+            <textarea
+              id="text"
+              name="text"
+              value={formData.text}
+              onChange={handleChange}
+              placeholder="Scrivi una domanda specifica sulla cultura italiana..."
+              rows="4"
+              required
+              disabled={loading}
+            />
             <small className="form-hint">
               Esempi: "Qual è il gesto italiano per dire 'delizioso'?", "Quale programma TV italiano era famoso negli
               anni '80?"

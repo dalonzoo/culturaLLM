@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List
 import re
-from pydantic import BaseModel
 
 from backend.services.database import get_db
 from backend.services.llm_service import llm_service
@@ -156,49 +155,3 @@ async def get_answer(answer_id: int, db: Session = Depends(get_db)):
     if not answer:
         raise HTTPException(status_code=404, detail="Answer not found")
     return answer
-
-class AnswerValidationRequest(BaseModel):
-    answer_text: str
-    question_id: int
-
-class AnswerValidationResponse(BaseModel):
-    is_correct: bool
-    feedback: str
-    correct_answer: str = None
-
-@router.post("/validate", response_model=AnswerValidationResponse)
-async def validate_answer(
-    validation: AnswerValidationRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Valida una risposta usando l'AI confrontandola con la risposta AI salvata
-    """
-    # Recupera la domanda
-    question = db.query(Question).filter(Question.id == validation.question_id).first()
-    if not question:
-        raise HTTPException(status_code=404, detail="Question not found")
-    
-    # Recupera la risposta AI
-    llm_answer = db.query(Answer).filter(
-        Answer.question_id == validation.question_id,
-        Answer.is_llm_answer == True
-    ).first()
-    
-    if not llm_answer:
-        raise HTTPException(status_code=404, detail="AI answer not found for this question")
-    
-    # Usa il servizio LLM per validare la risposta
-    validation_result = llm_service.validate_answer(
-        question_text=question.text,
-        user_answer=validation.answer_text,
-        correct_answer=llm_answer.text,
-        cultural_context=question.theme.name if question.theme else ""
-    )
-    
-    return AnswerValidationResponse(
-        is_correct=validation_result["is_correct"],
-        feedback=validation_result["feedback"],
-        correct_answer=llm_answer.text if not validation_result["is_correct"] else None
-    )
