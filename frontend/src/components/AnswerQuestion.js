@@ -11,7 +11,6 @@ function AnswerQuestion() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-  const [validationResult, setValidationResult] = useState(null)
 
   useEffect(() => {
     fetchPendingQuestions()
@@ -38,28 +37,15 @@ function AnswerQuestion() {
     setSubmitting(true)
     setError("")
     setSuccess("")
-    setValidationResult(null)
 
     try {
       const currentQuestion = questions[currentQuestionIndex]
-      
-      // Prima invia la risposta
-      const answerResponse = await api.post("/api/answers/", {
+      await api.post("/api/answers/", {
         text: answer,
         question_id: currentQuestion.id,
       })
 
-      // Poi valuta la risposta
-      const validationResponse = await api.post("/api/cultural-questions/evaluate-answer", {
-        question_id: currentQuestion.id,
-        answer_text: answer
-      })
-
-      setValidationResult({
-        score: validationResponse.data.score,
-        evaluation: validationResponse.data.evaluation
-      })
-      setSuccess("Risposta inviata e valutata con successo!")
+      setSuccess("Risposta inviata con successo!")
       setAnswer("")
 
       // Move to next question or refresh list
@@ -71,10 +57,7 @@ function AnswerQuestion() {
         setCurrentQuestionIndex(0)
       }
 
-      setTimeout(() => {
-        setSuccess("")
-        setValidationResult(null)
-      }, 5000)
+      setTimeout(() => setSuccess(""), 3000)
     } catch (error) {
       setError(error.response?.data?.detail || "Errore nell'invio della risposta")
     }
@@ -91,23 +74,6 @@ function AnswerQuestion() {
     setAnswer("")
     setError("")
     setSuccess("")
-    setValidationResult(null)
-  }
-
-  const getScoreColor = (score) => {
-    if (score <= 2) return '#ff1a1a';
-    if (score <= 4) return '#ff4d4d';
-    if (score <= 6) return '#ffa64d';
-    if (score <= 8) return '#80cc33';
-    return '#4CAF50';
-  }
-
-  const getQualitativeScore = (score) => {
-    if (score <= 2) return "Completamente sbagliata";
-    if (score <= 4) return "Insufficiente";
-    if (score <= 6) return "Parzialmente corretta";
-    if (score <= 8) return "Buona risposta";
-    return "Risposta eccellente";
   }
 
   if (loading) {
@@ -158,20 +124,6 @@ function AnswerQuestion() {
                 disabled={submitting}
               />
             </div>
-
-            {validationResult && (
-              <div className="validation-result" style={{ marginTop: '1rem' }}>
-                <h4>Valutazione della risposta:</h4>
-                <div className="validation-badge" style={{
-                  backgroundColor: `${getScoreColor(validationResult.score)}20`,
-                  color: getScoreColor(validationResult.score),
-                  borderColor: `${getScoreColor(validationResult.score)}40`
-                }}>
-                  {getQualitativeScore(validationResult.score)}
-                </div>
-                <p className="validation-feedback">{validationResult.evaluation}</p>
-              </div>
-            )}
 
             <div className="form-actions">
               <button type="button" onClick={handleSkip} className="btn btn-outline" disabled={submitting}>

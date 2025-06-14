@@ -13,7 +13,7 @@ function CreateQuestion() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-  const [generatingLLM, setGeneratingLLM] = useState(false)
+  const [generatingQuestion, setGeneratingQuestion] = useState(false)
 
   const navigate = useNavigate()
 
@@ -30,39 +30,32 @@ function CreateQuestion() {
     }
   }
 
-  const handleGenerateLLMQuestion = async () => {
-    if (!formData.theme_id) {
-      setError("Seleziona prima un tema")
-      return
-    }
-
-    setGeneratingLLM(true)
-    setError("")
-    setSuccess("")
-
-    try {
-      const theme = themes.find(t => t.id === Number.parseInt(formData.theme_id))
-      const response = await api.post("/api/cultural-questions/generate", {
-        topic: theme.name
-      })
-
-      setFormData({
-        ...formData,
-        text: response.data.question
-      })
-      setSuccess("Domanda generata con successo!")
-    } catch (error) {
-      setError(error.response?.data?.detail || "Errore nella generazione della domanda")
-    }
-
-    setGeneratingLLM(false)
-  }
-
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     })
+  }
+
+  const generateQuestion = async () => {
+    if (!formData.theme_id) {
+      setError("Seleziona prima un tema")
+      return
+    }
+    setGeneratingQuestion(true)
+    setError("")
+    setSuccess("")
+    try {
+      const response = await api.post(`/api/questions/generate/${formData.theme_id}`)
+      setFormData(prev => ({
+        ...prev,
+        text: response.data.text
+      }))
+      setSuccess("Domanda generata! Puoi modificarla o rigenerarla, poi premi 'Crea Domanda' per confermare.")
+    } catch (error) {
+      setError(error.response?.data?.detail || "Errore nella generazione della domanda")
+    }
+    setGeneratingQuestion(false)
   }
 
   const handleSubmit = async (e) => {
@@ -108,7 +101,7 @@ function CreateQuestion() {
               value={formData.theme_id}
               onChange={handleChange}
               required
-              disabled={loading || generatingLLM}
+              disabled={loading}
             >
               <option value="">Seleziona un tema</option>
               {themes.map((theme) => (
@@ -118,34 +111,43 @@ function CreateQuestion() {
               ))}
             </select>
             {formData.theme_id && (
-              <div className="theme-actions">
-                <small className="theme-description">
-                  {themes.find((t) => t.id === Number.parseInt(formData.theme_id))?.description}
-                </small>
-                <button
-                  type="button"
-                  onClick={handleGenerateLLMQuestion}
-                  className="btn btn-secondary btn-sm"
-                  disabled={generatingLLM}
-                >
-                  {generatingLLM ? "Generazione in corso..." : "Genera con AI"}
-                </button>
-              </div>
+              <small className="theme-description">
+                {themes.find((t) => t.id === Number.parseInt(formData.theme_id))?.description}
+              </small>
             )}
           </div>
 
           <div className="form-group">
             <label htmlFor="text">Testo della Domanda</label>
-            <textarea
-              id="text"
-              name="text"
-              value={formData.text}
-              onChange={handleChange}
-              placeholder="Scrivi una domanda specifica sulla cultura italiana..."
-              rows="4"
-              required
-              disabled={loading}
-            />
+            <div className="question-input-container">
+              <textarea
+                id="text"
+                name="text"
+                value={formData.text}
+                onChange={handleChange}
+                placeholder="Scrivi una domanda specifica sulla cultura italiana..."
+                rows="4"
+                required
+                disabled={loading || generatingQuestion}
+              />
+              <button
+                type="button"
+                onClick={generateQuestion}
+                className="btn btn-secondary generate-btn"
+                disabled={!formData.theme_id || loading || generatingQuestion}
+              >
+                {generatingQuestion ? (
+                  <span className="generating-text">
+                    <span className="loading-dots">Generazione in corso</span>
+                  </span>
+                ) : (
+                  <>
+                    <span className="generate-icon">✨</span>
+                    Genera Domanda
+                  </>
+                )}
+              </button>
+            </div>
             <small className="form-hint">
               Esempi: "Qual è il gesto italiano per dire 'delizioso'?", "Quale programma TV italiano era famoso negli
               anni '80?"

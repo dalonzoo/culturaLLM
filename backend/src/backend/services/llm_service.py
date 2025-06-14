@@ -87,6 +87,46 @@ class LLMService:
         except:
             return False
 
+    def generate_tag(self, question: str) -> str:
+        """
+        Genera un tag riassuntivo (max 3 parole) per una domanda usando il modello LLM.
+        Args:
+            question: La domanda da riassumere
+        Returns:
+            Un tag di massimo 3 parole
+        """
+        prompt = f"""
+        Leggi attentamente la seguente affermazione. 
+        Genera un singolo tag che ne rappresenti al meglio il significato o l’argomento principale. 
+        Non deve essere un riassunto della domanda, ma deve solo prendere in considerazione l'argomento principale.
+        Cerca di usare parole che sono utilizzate già nella affermazione senza crearne altre.
+        Il tag deve essere composto da massimo 3 parole, ma usa meno parole possibile (preferibilmente una o due parole, solo raramente tre se strettamente necessario).
+        Il tag deve essere sintetico, rappresentativo e privo di spiegazioni o punteggiatura.
+        Rispondi esclusivamente con il tag, senza testo aggiuntivo.
+        Affermazione: {question}
+        """
+        try:
+            response = requests.post(
+                f"{self.host}/api/generate",
+                json={
+                    "model": self.model,
+                    "prompt": prompt,
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.3,
+                        "top_p": 0.8,
+                        "max_tokens": 10
+                    }
+                },
+                timeout=60,
+            )
+            response.raise_for_status()
+            result = response.json()
+            return result.get("response", "").strip()
+        except requests.exceptions.RequestException as e:
+            print(f"Error calling LLM for tag: {e}")
+            return "Tag non disponibile"
+
 # Istanza globale del servizio
 # Viene utilizzata in tutta l'applicazione per accedere al servizio LLM
 llm_service = LLMService()

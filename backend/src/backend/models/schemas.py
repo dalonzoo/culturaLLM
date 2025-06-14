@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, Float, UniqueConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -44,6 +44,7 @@ class Question(Base):
     theme_id = Column(Integer, ForeignKey("cultural_themes.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     is_active = Column(Boolean, default=True)
+    tag = Column(String(100), nullable=True)
     
     creator = relationship("User", back_populates="questions")
     theme = relationship("CulturalTheme", back_populates="questions")
@@ -62,6 +63,7 @@ class Answer(Base):
     question = relationship("Question", back_populates="answers")
     user = relationship("User", back_populates="answers")
     validations = relationship("Validation", back_populates="answer")
+    llm_validations = relationship("LLMValidation", back_populates="answer")
 
 class Validation(Base):
     __tablename__ = "validations"
@@ -76,6 +78,28 @@ class Validation(Base):
     
     answer = relationship("Answer", back_populates="validations")
     validator = relationship("User", back_populates="validations")
+
+class LLMValidation(Base):
+    __tablename__ = "llm_validations"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    answer_id = Column(Integer, ForeignKey("answers.id"), nullable=False)
+    score = Column(Float, nullable=False)  # 0-10 score
+    is_correct = Column(Boolean, nullable=False)
+    feedback = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    answer = relationship("Answer", back_populates="llm_validations")
+
+class ValidatedTag(Base):
+    __tablename__ = "validated_tags"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    question_id = Column(Integer, ForeignKey("questions.id"), nullable=False)
+    tag = Column(String(100), nullable=False)
+    score = Column(Float, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    __table_args__ = (UniqueConstraint('user_id', 'question_id', name='_user_question_uc'),)
 
 # Pydantic Models
 class UserBase(BaseModel):
@@ -123,6 +147,7 @@ class QuestionResponse(BaseModel):
     theme_id: int
     created_at: datetime
     theme: CulturalThemeResponse
+    tag: Optional[str] = None
     
     class Config:
         from_attributes = True
@@ -151,7 +176,7 @@ class ValidationCreate(BaseModel):
 class ValidationResponse(BaseModel):
     id: int
     answer_id: int
-    validator_id: int
+    validator_id: Optional[int]
     score: float
     is_correct: bool
     feedback: Optional[str]
@@ -182,30 +207,22 @@ class QuestionModel(BaseModel):
     created_at: datetime
     is_active: bool
     theme: Optional[CulturalThemeResponse] = None
+    tag: Optional[str] = None
 
     class Config:
         from_attributes = True
 
-class CulturalQuestion(Base):
-    __tablename__ = "cultural_questions"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    topic = Column(String(255), nullable=False)
-    question = Column(Text, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    # Relazione one-to-many con le risposte
-    answers = relationship("QuestionAnswer", back_populates="question")
+class TagResponse(BaseModel):
+    tag: str
 
-class QuestionAnswer(Base):
-    __tablename__ = "question_answers"
-    
-    id = Column(Integer, primary_key=True, index=True)
-    question_id = Column(Integer, ForeignKey("cultural_questions.id"))
-    answer_text = Column(Text, nullable=False)
-    score = Column(Float, nullable=False)  # Voto da 1 a 5
-    evaluation = Column(Text, nullable=False)  # Spiegazione della valutazione
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    # Relazione many-to-one con la domanda
-    question = relationship("CulturalQuestion", back_populates="answers") 
+class ValidatedTagResponse(BaseModel):
+    tag: str
+    score: float
+    question_id: int
+    user_id: int
+    created_at: datetime
+    class Config:
+        from_attributes = True
+
+class ValidatedTagResponseList(BaseModel):
+    items: list[ValidatedTagResponse]

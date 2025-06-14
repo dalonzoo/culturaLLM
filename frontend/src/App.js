@@ -9,6 +9,7 @@ import CreateQuestion from "./components/CreateQuestion"
 import AnswerQuestion from "./components/AnswerQuestion"
 import ValidateAnswers from "./components/ValidateAnswers"
 import Leaderboard from "./components/Leaderboard"
+import ValidatedTags from "./components/ValidatedTags"
 import "./App.css"
 
 function ProtectedRoute({ children }) {
@@ -63,6 +64,14 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <Leaderboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/validated-tags"
+                element={
+                  <ProtectedRoute>
+                    <ValidatedTags />
                   </ProtectedRoute>
                 }
               />

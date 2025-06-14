@@ -25,6 +25,8 @@ function ValidateAnswers() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
+  const [llmValidation, setLlmValidation] = useState(null)
+  const [showLlmValidation, setShowLlmValidation] = useState(false)
 
   useEffect(() => {
     fetchPendingValidations()
@@ -71,6 +73,8 @@ function ValidateAnswers() {
     setSubmitting(true)
     setError("")
     setSuccess("")
+    setLlmValidation(null)
+    setShowLlmValidation(false)
 
     try {
       const currentAnswer = pendingAnswers[currentAnswerIndex]
@@ -78,24 +82,21 @@ function ValidateAnswers() {
         throw new Error("ID risposta non valido")
       }
 
-      // Validate human answer - now using score to determine correctness
-      await api.post("/api/validate/", {
-        answer_id: currentAnswer.answer.id,
-        score: Number.parseFloat(validation.human_score),
-        is_correct: Number.parseFloat(validation.human_score) >= 6,
-        feedback: validation.human_feedback,
-      })
+      // Esegui le validazioni in parallelo
+      const [humanValidation, llmValidationResult] = await Promise.all([
+        // Validazione umana
+        api.post("/api/validate/", {
+          answer_id: currentAnswer.answer.id,
+          score: Number.parseFloat(validation.human_score),
+          is_correct: Number.parseFloat(validation.human_score) >= 6,
+          feedback: validation.human_feedback,
+        }),
+        // Validazione LLM - usando query parameter invece del body
+        api.post(`/api/validate/llm-validate?answer_id=${currentAnswer.answer.id}`)
+      ])
 
-      // Validate LLM answer if exists
-      if (currentAnswer.llm_answer) {
-        await api.post("/api/validate/", {
-          answer_id: currentAnswer.llm_answer.id,
-          score: Number.parseFloat(validation.llm_score),
-          is_correct: Number.parseFloat(validation.llm_score) >= 6,
-          feedback: validation.llm_feedback,
-        })
-      }
-
+      setLlmValidation(llmValidationResult.data)
+      setShowLlmValidation(true)
       setSuccess("Validazioni inviate con successo!")
 
       // Move to next answer or refresh list
@@ -114,10 +115,27 @@ function ValidateAnswers() {
         llm_feedback: "",
       })
 
-      setTimeout(() => setSuccess(""), 3000)
+      setTimeout(() => {
+        setSuccess("")
+        setShowLlmValidation(false)
+        setLlmValidation(null)
+      }, 5000)
     } catch (error) {
       console.error("Errore validazione:", error)
-      setError(error.response?.data?.detail || "Errore nell'invio della validazione")
+      let errorMessage = "Errore nell'invio della validazione"
+      
+      if (error.response?.data?.detail) {
+        if (Array.isArray(error.response.data.detail)) {
+          // Gestione errori di validazione Pydantic
+          errorMessage = error.response.data.detail.map(err => err.msg).join(", ")
+        } else {
+          errorMessage = error.response.data.detail
+        }
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      setError(errorMessage)
     }
 
     setSubmitting(false)
@@ -170,6 +188,24 @@ function ValidateAnswers() {
       <div className="validation-container">
         {error && <div className="error-message">{error}</div>}
         {success && <div className="success-message">{success}</div>}
+
+        {showLlmValidation && llmValidation && (
+          <div className="llm-validation-result">
+            <h3>Validazione IA 🤖</h3>
+            <div className="validation-details">
+              <div className="validation-score">
+                <span className="score-label">Punteggio:</span>
+                <span className={`score-value ${llmValidation.score >= 6 ? 'correct' : 'incorrect'}`}>
+                  {llmValidation.score.toFixed(1)}/10
+                </span>
+              </div>
+              <div className="validation-feedback">
+                <span className="feedback-label">Feedback:</span>
+                <p className="feedback-text">{llmValidation.feedback}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="answer-card">
           <div className="question-section">
