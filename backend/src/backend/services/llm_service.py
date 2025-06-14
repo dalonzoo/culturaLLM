@@ -38,7 +38,8 @@ class LLMService:
         # Costruzione del prompt con istruzioni specifiche per il modello
         prompt = f"""
         Sei un assistente esperto nella cultura italiana. Rispondi alla seguente domanda in modo accurato e culturalmente appropriato.Non dare risposte troppo lunghe.
-        
+        Importante che la risposta sia umana e naturale senza markdown,'*' o formattazioni particolari o suddivisioni in paragrafi, quindi tutto in un unico paragrafo.
+        Importante che non si capisca che è la risposta di un modello LLM.
         Contesto culturale: {cultural_context}
         
         Domanda: {question}
@@ -67,7 +68,10 @@ class LLMService:
             
             # Estrae e pulisce la risposta dal JSON
             result = response.json()
-            return result.get("response", "").strip()
+            response_text = result.get("response", "").strip()
+            # Rimuove gli asterischi dalla risposta
+            response_text = response_text.replace('*', '')
+            return response_text
             
         except requests.exceptions.RequestException as e:
             # Gestione degli errori di rete o del servizio
@@ -97,7 +101,7 @@ class LLMService:
         """
         prompt = f"""
         Leggi attentamente la seguente affermazione. 
-        Genera un singolo tag che ne rappresenti al meglio il significato o l’argomento principale. 
+        Genera un singolo tag che ne rappresenti al meglio il significato o l'argomento principale. 
         Non deve essere un riassunto della domanda, ma deve solo prendere in considerazione l'argomento principale.
         Cerca di usare parole che sono utilizzate già nella affermazione senza crearne altre.
         Il tag deve essere composto da massimo 3 parole, ma usa meno parole possibile (preferibilmente una o due parole, solo raramente tre se strettamente necessario).

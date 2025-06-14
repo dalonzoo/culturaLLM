@@ -13,14 +13,10 @@ function Dashboard() {
     recentActivity: [],
   })
   const [randomTheme, setRandomTheme] = useState(null)
-  const [validatedTags, setValidatedTags] = useState([])
-  const [answerTags, setAnswerTags] = useState([])
 
   useEffect(() => {
     fetchDashboardData()
     fetchRandomTheme()
-    fetchValidatedTags()
-    fetchAnswerTags()
   }, [])
 
   const fetchDashboardData = async () => {
@@ -42,24 +38,6 @@ function Dashboard() {
       setRandomTheme(response.data)
     } catch (error) {
       console.error("Error fetching random theme:", error)
-    }
-  }
-
-  const fetchValidatedTags = async () => {
-    try {
-      const response = await api.get("/api/validate/validated-tags/me")
-      setValidatedTags(response.data.items)
-    } catch (error) {
-      // silenzio
-    }
-  }
-
-  const fetchAnswerTags = async () => {
-    try {
-      const response = await api.get("/api/validate/validated-tags/by-answers")
-      setAnswerTags(response.data.items)
-    } catch (error) {
-      // silenzio
     }
   }
 

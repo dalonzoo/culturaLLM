@@ -25,8 +25,12 @@ function ValidateAnswers() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
-  const [llmValidation, setLlmValidation] = useState(null)
+  const [llmValidation, setLlmValidation] = useState({
+    human: null,
+    llm: null
+  })
   const [showLlmValidation, setShowLlmValidation] = useState(false)
+  const [validationStep, setValidationStep] = useState('idle') // 'idle', 'submitting', 'llm_validating', 'completed'
 
   useEffect(() => {
     fetchPendingValidations()
@@ -68,13 +72,34 @@ function ValidateAnswers() {
     return '#4CAF50';
   }
 
+  const handleCloseValidation = () => {
+    setShowLlmValidation(false)
+    setLlmValidation({ human: null, llm: null })
+    setValidationStep('idle')
+    
+    // Move to next answer or refresh list
+    if (currentAnswerIndex < pendingAnswers.length - 1) {
+      setCurrentAnswerIndex(currentAnswerIndex + 1)
+    } else {
+      fetchPendingValidations()
+      setCurrentAnswerIndex(0)
+    }
+
+    // Reset validation form
+    setValidation({
+      human_score: 5.5,
+      human_feedback: "",
+      llm_score: 5.5,
+      llm_feedback: "",
+    })
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setSubmitting(true)
     setError("")
     setSuccess("")
-    setLlmValidation(null)
-    setShowLlmValidation(false)
+    setValidationStep('submitting')
 
     try {
       const currentAnswer = pendingAnswers[currentAnswerIndex]
@@ -82,51 +107,34 @@ function ValidateAnswers() {
         throw new Error("ID risposta non valido")
       }
 
-      // Esegui le validazioni in parallelo
-      const [humanValidation, llmValidationResult] = await Promise.all([
-        // Validazione umana
-        api.post("/api/validate/", {
-          answer_id: currentAnswer.answer.id,
-          score: Number.parseFloat(validation.human_score),
-          is_correct: Number.parseFloat(validation.human_score) >= 6,
-          feedback: validation.human_feedback,
-        }),
-        // Validazione LLM - usando query parameter invece del body
-        api.post(`/api/validate/llm-validate?answer_id=${currentAnswer.answer.id}`)
-      ])
-
-      setLlmValidation(llmValidationResult.data)
-      setShowLlmValidation(true)
-      setSuccess("Validazioni inviate con successo!")
-
-      // Move to next answer or refresh list
-      if (currentAnswerIndex < pendingAnswers.length - 1) {
-        setCurrentAnswerIndex(currentAnswerIndex + 1)
-      } else {
-        fetchPendingValidations()
-        setCurrentAnswerIndex(0)
-      }
-
-      // Reset validation form
-      setValidation({
-        human_score: 5.5,
-        human_feedback: "",
-        llm_score: 5.5,
-        llm_feedback: "",
+      // Prima invia la validazione umana
+      await api.post("/api/validate/", {
+        answer_id: currentAnswer.answer.id,
+        score: Number.parseFloat(validation.human_score),
+        is_correct: Number.parseFloat(validation.human_score) >= 6,
+        feedback: validation.human_feedback,
       })
 
-      setTimeout(() => {
-        setSuccess("")
-        setShowLlmValidation(false)
-        setLlmValidation(null)
-      }, 5000)
+      setValidationStep('llm_validating')
+      setSuccess("Validazione umana inviata. In attesa della validazione IA...")
+
+      // Poi richiedi la validazione LLM
+      const llmValidationResult = await api.post(`/api/validate/llm-validate?answer_id=${currentAnswer.answer.id}`)
+
+      setLlmValidation({
+        human: llmValidationResult.data[0],
+        llm: llmValidationResult.data[1]
+      })
+      setShowLlmValidation(true)
+      setValidationStep('completed')
+      setSuccess("Validazioni completate!")
+
     } catch (error) {
       console.error("Errore validazione:", error)
       let errorMessage = "Errore nell'invio della validazione"
       
       if (error.response?.data?.detail) {
         if (Array.isArray(error.response.data.detail)) {
-          // Gestione errori di validazione Pydantic
           errorMessage = error.response.data.detail.map(err => err.msg).join(", ")
         } else {
           errorMessage = error.response.data.detail
@@ -136,6 +144,7 @@ function ValidateAnswers() {
       }
       
       setError(errorMessage)
+      setValidationStep('idle')
     }
 
     setSubmitting(false)
@@ -189,19 +198,49 @@ function ValidateAnswers() {
         {error && <div className="error-message">{error}</div>}
         {success && <div className="success-message">{success}</div>}
 
-        {showLlmValidation && llmValidation && (
-          <div className="llm-validation-result">
-            <h3>Validazione IA 🤖</h3>
-            <div className="validation-details">
-              <div className="validation-score">
-                <span className="score-label">Punteggio:</span>
-                <span className={`score-value ${llmValidation.score >= 6 ? 'correct' : 'incorrect'}`}>
-                  {llmValidation.score.toFixed(1)}/10
-                </span>
-              </div>
-              <div className="validation-feedback">
-                <span className="feedback-label">Feedback:</span>
-                <p className="feedback-text">{llmValidation.feedback}</p>
+        {showLlmValidation && (llmValidation.human || llmValidation.llm) && (
+          <div className="llm-validation-dialog">
+            <div className="llm-validation-content">
+              <button 
+                className="close-button" 
+                onClick={handleCloseValidation}
+                aria-label="Chiudi validazione"
+              >
+                ×
+              </button>
+              <h3>Validazione IA 🤖</h3>
+              <div className="validation-details">
+                {llmValidation.human && (
+                  <div className="validation-section">
+                    <h4>Risposta 1</h4>
+                    <div className="validation-score">
+                      <span className="score-label">Punteggio:</span>
+                      <span className={`score-value ${llmValidation.human.score >= 6 ? 'correct' : 'incorrect'}`}>
+                        {llmValidation.human.score.toFixed(1)}/10
+                      </span>
+                    </div>
+                    <div className="validation-feedback">
+                      <span className="feedback-label">Feedback:</span>
+                      <p className="feedback-text">{llmValidation.human.feedback}</p>
+                    </div>
+                  </div>
+                )}
+                
+                {llmValidation.llm && (
+                  <div className="validation-section">
+                    <h4>Risposta 2</h4>
+                    <div className="validation-score">
+                      <span className="score-label">Punteggio:</span>
+                      <span className={`score-value ${llmValidation.llm.score >= 6 ? 'correct' : 'incorrect'}`}>
+                        {llmValidation.llm.score.toFixed(1)}/10
+                      </span>
+                    </div>
+                    <div className="validation-feedback">
+                      <span className="feedback-label">Feedback:</span>
+                      <p className="feedback-text">{llmValidation.llm.feedback}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -215,21 +254,14 @@ function ValidateAnswers() {
           </div>
 
           <div className="answer-section">
-            <h3>Risposta Utente:</h3>
+            <h3>Risposta 1:</h3>
             <div className="answer-content">
               <p>{currentAnswer.answer.text}</p>
-              <div className="answer-meta">
-                {currentAnswer.answer.is_llm_answer ? (
-                  <span className="llm-badge">🤖 Risposta IA</span>
-                ) : (
-                  <span className="human-badge">👤 Risposta Umana</span>
-                )}
-              </div>
             </div>
             {/* Validazione risposta umana */}
             <div className="validation-form">
               <div className="validation-section">
-                <h3>Validazione Risposta Umana</h3>
+                <h3>Validazione</h3>
                 <div className="form-group">
                   <label htmlFor="human_score">Valutazione:</label>
                   <div className="score-slider-container">
@@ -267,7 +299,7 @@ function ValidateAnswers() {
                     id="human_feedback"
                     value={validation.human_feedback}
                     onChange={(e) => setValidation({ ...validation, human_feedback: e.target.value })}
-                    placeholder="Aggiungi un commento sulla risposta umana..."
+                    placeholder="Aggiungi un commento sulla risposta..."
                     rows="3"
                     disabled={submitting}
                   />
@@ -278,21 +310,18 @@ function ValidateAnswers() {
 
           {currentAnswer.llm_answer && (
             <div className="llm-answer-section">
-              <h3>Risposta IA:</h3>
+              <h3>Risposta 2:</h3>
               <div className="answer-content">
                 <div
                   dangerouslySetInnerHTML={{
                     __html: formatLLMText(currentAnswer.llm_answer.text),
                   }}
                 />
-                <div className="answer-meta">
-                  <span className="llm-badge">🤖 Risposta IA</span>
-                </div>
               </div>
               {/* Validazione risposta IA */}
               <div className="validation-form">
                 <div className="validation-section">
-                  <h3>Validazione Risposta IA</h3>
+                  <h3>Validazione</h3>
                   <div className="form-group">
                     <label htmlFor="llm_score">Valutazione:</label>
                     <div className="score-slider-container">
@@ -330,7 +359,7 @@ function ValidateAnswers() {
                       id="llm_feedback"
                       value={validation.llm_feedback}
                       onChange={(e) => setValidation({ ...validation, llm_feedback: e.target.value })}
-                      placeholder="Aggiungi un commento sulla risposta IA..."
+                      placeholder="Aggiungi un commento sulla risposta..."
                       rows="3"
                       disabled={submitting}
                     />
@@ -346,7 +375,9 @@ function ValidateAnswers() {
               Salta
             </button>
             <button type="submit" className="btn btn-primary" disabled={submitting}>
-              {submitting ? "Invio in corso..." : "Invia Validazioni"}
+              {validationStep === 'submitting' ? "Invio validazione..." : 
+               validationStep === 'llm_validating' ? "Validazione IA in corso..." :
+               "Invia Validazioni"}
             </button>
           </div>
         </form>
@@ -357,6 +388,87 @@ function ValidateAnswers() {
           ></div>
         </div>
       </div>
+
+      <style jsx>{`
+        .llm-validation-dialog {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background-color: rgba(0, 0, 0, 0.5);
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          z-index: 1000;
+        }
+
+        .llm-validation-content {
+          background-color: white;
+          padding: 2rem;
+          border-radius: 8px;
+          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+          max-width: 600px;
+          width: 90%;
+          max-height: 90vh;
+          overflow-y: auto;
+          position: relative;
+        }
+
+        .close-button {
+          position: absolute;
+          top: 1rem;
+          right: 1rem;
+          background: none;
+          border: none;
+          font-size: 1.5rem;
+          cursor: pointer;
+          color: #666;
+          padding: 0.5rem;
+          line-height: 1;
+        }
+
+        .close-button:hover {
+          color: #000;
+        }
+
+        .validation-section {
+          margin-bottom: 1.5rem;
+          padding: 1rem;
+          border-radius: 4px;
+          background-color: #f8f9fa;
+        }
+
+        .validation-section h4 {
+          margin-top: 0;
+          color: #333;
+        }
+
+        .validation-score {
+          margin: 1rem 0;
+        }
+
+        .score-value {
+          font-weight: bold;
+          padding: 0.25rem 0.5rem;
+          border-radius: 4px;
+        }
+
+        .score-value.correct {
+          background-color: #e8f5e9;
+          color: #2e7d32;
+        }
+
+        .score-value.incorrect {
+          background-color: #ffebee;
+          color: #c62828;
+        }
+
+        .feedback-text {
+          margin: 0.5rem 0;
+          line-height: 1.5;
+        }
+      `}</style>
     </div>
   )
 }
