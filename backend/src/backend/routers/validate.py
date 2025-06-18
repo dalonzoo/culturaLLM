@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, UniqueConstraint
 from typing import List
@@ -270,41 +270,50 @@ async def validate_with_llm(
     # Funzione helper per validare una singola risposta
     def validate_single_answer(answer, is_llm=False):
         prompt = f"""
-        Valuta la seguente risposta a una domanda sulla cultura italiana,sei un esperto di cultura italiana.
-        Non ti fare problemi a dare voti molto bassi se ritieni la risposta sbagliata o non pertinente.
-        Domanda: {question.text}
-        Tema: {question.theme.name if question.theme else 'N/A'}
-        Risposta da valutare: {answer.text}
-        Tipo risposta: {'LLM' if is_llm else 'Umana'}
-        
-        Valuta la risposta considerando:
-        1. Correttezza (accuratezza delle informazioni)
-        2. Rilevanza (pertinenza rispetto alla domanda)
-        3. Dettaglio (completezza della risposta)
-        4. Chiarezza (comprensibilità e struttura)
-        
-        Fornisci:
-        1. Un punteggio da 0 a 5 per ogni criterio (0 = completamente sbagliato/inappropriato)
-        2. Un punteggio complessivo da 0 a 5
-        3. Un breve feedback che spieghi la valutazione
-        
-        Formato richiesto:
-        Correttezza: [0-5]
-        Rilevanza: [0-5]
-        Dettaglio: [0-5]
-        Chiarezza: [0-5]
-        Punteggio complessivo: [0-5]
-        Feedback: [breve spiegazione]
-        Non usare markdown o formattazioni particolari.
-        Rispetta esattamente il formato richiesto.Non sono ammessi errori.
-        """
+        Sei un esperto di cultura italiana e il tuo compito è valutare una risposta a una domanda su questo tema.
+
+ISTRUZIONI IMPORTANTI:
+Devi fornire ESATTAMENTE il seguente formato, senza alcuna variazione, senza markdown, senza intestazioni, senza spiegazioni extra. Ogni campo deve apparire nell'ordine esatto, con etichette identiche e valori numerici nel formato richiesto. Non usare punti elenco, non saltare righe. Eventuali deviazioni sono considerate errore.
+
+Domanda: {question.text}  
+Tema: {question.theme.name if question.theme else 'N/A'}  
+Risposta da valutare: {answer.text}  
+Tipo risposta: {'LLM' if is_llm else 'Umana'}
+
+Valuta la risposta considerando i seguenti 4 criteri:
+1. Correttezza (accuratezza delle informazioni)
+2. Rilevanza (pertinenza rispetto alla domanda)
+3. Dettaglio (completezza della risposta)
+4. Chiarezza (comprensibilità e struttura)
+
+Assegna:
+- Un punteggio da 0 a 5 per ciascun criterio
+- Un punteggio complessivo da 0 a 5
+- Un breve feedback (1-2 frasi) che giustifichi il punteggio
+
+RISPOSTA FINALE – FORMATO OBBLIGATORIO:
+Correttezza: [0-5]  
+Rilevanza: [0-5]  
+Dettaglio: [0-5]  
+Chiarezza: [0-5]  
+Punteggio complessivo: [0-5]  
+Feedback: [breve spiegazione della valutazione]
+
+NON includere altri commenti, spiegazioni, simboli o formattazioni. Segui il formato richiesto alla lettera.
+"""
         
         llm_response = llm_service.generate_answer(prompt)
         
         try:
             # Dividi la risposta in righe e rimuovi spazi vuoti
             lines = [line.strip() for line in llm_response.split('\n') if line.strip()]
-            
+            print("--------------------------------")
+            print("--------------------------------")
+            print("Domanda valutata: ", question.text)
+            print("Risposta da valutare: ", answer.text)
+            print("risposta ricevuta LLM: ", lines)
+            print("--------------------------------")
+            print("--------------------------------")
             # Cerca il punteggio complessivo
             score_lines = [line for line in lines if 'Punteggio complessivo:' in line]
             if not score_lines:
@@ -387,3 +396,81 @@ async def get_validated_tags_by_answers(current_user: User = Depends(get_current
         ValidatedTag.question_id.in_(answered_questions)
     ).all()
     return ValidatedTagResponseList(items=tags)
+
+@router.post("/llm-validate-text", response_model=List[ValidationResponse])
+async def validate_with_llm_text(
+    answer_text: str = Body(..., embed=True),
+    question_text: str = Body("Domanda di esempio", embed=True),
+    theme: str = Body("Tema generico", embed=True),
+):
+    """
+    Valida una risposta arbitraria (non presente nel DB) e una risposta LLM generata al volo.
+    Restituisce una lista di 2 ValidationResponse (mock, senza DB).
+    """
+    # Funzione helper per validare una singola risposta
+    def validate_single_answer(answer_text, is_llm=False):
+        prompt = f"""
+        Valuta la seguente risposta a una domanda sulla cultura italiana,sei un esperto di cultura italiana.
+        Non ti fare problemi a dare voti molto bassi se ritieni la risposta sbagliata o non pertinente.
+        Domanda: {question_text}
+        Tema: {theme}
+        Risposta da valutare: {answer_text}
+        Tipo risposta: {'LLM' if is_llm else 'Umana'}
+        
+        Valuta la risposta considerando:
+        1. Correttezza (accuratezza delle informazioni)
+        2. Rilevanza (pertinenza rispetto alla domanda)
+        3. Dettaglio (completezza della risposta)
+        4. Chiarezza (comprensibilità e struttura)
+        
+        Fornisci:
+        1. Un punteggio da 0 a 5 per ogni criterio (0 = completamente sbagliato/inappropriato)
+        2. Un punteggio complessivo da 0 a 5
+        3. Un breve feedback che spieghi la valutazione
+        
+        Formato di risposta richiesto:
+        Correttezza: [0-5]
+        Rilevanza: [0-5]
+        Dettaglio: [0-5]
+        Chiarezza: [0-5]
+        Punteggio complessivo: [0-5]
+        Feedback: [breve spiegazione]
+        Non usare markdown o formattazioni particolari.
+        Rispetta esattamente il formato richiesto.Non sono ammessi errori.
+        Riporta quindi correttezza, rilevanza, dettaglio, chiarezza, punteggio complessivo e feedback.
+        """
+        llm_response = llm_service.generate_answer(prompt)
+        try:
+            lines = [line.strip() for line in llm_response.split('\n') if line.strip()]
+            score_lines = [line for line in lines if 'Punteggio complessivo:' in line]
+            if not score_lines:
+                raise ValueError("Formato risposta non valido: manca il punteggio complessivo")
+            score_str = score_lines[0].split(':')[1].strip()
+            match = re.search(r'([0-5])', score_str)
+            if not match:
+                raise ValueError(f"Punteggio non valido nel testo: {score_str}")
+            score = float(match.group(1))
+            feedback_lines = [line for line in lines if 'Feedback:' in line]
+            if not feedback_lines:
+                raise ValueError("Formato risposta non valido: manca il feedback")
+            feedback = feedback_lines[0].split(':')[1].strip()
+            if not feedback:
+                feedback = "Nessun feedback fornito"
+            normalized_score = (score / 5) * 10
+            return ValidationResponse(
+                id=0,
+                answer_id=0,
+                validator_id=None,
+                score=normalized_score,
+                is_correct=normalized_score >= 6,
+                feedback=feedback,
+                created_at=None
+            )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Errore nel parsing della risposta LLM: {str(e)}")
+    # Genera una risposta LLM per la stessa domanda
+    llm_generated_answer = llm_service.generate_answer(question_text, theme)
+    return [
+        validate_single_answer(answer_text, is_llm=False),
+        validate_single_answer(llm_generated_answer, is_llm=True)
+    ]

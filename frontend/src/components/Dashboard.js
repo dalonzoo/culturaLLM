@@ -49,7 +49,10 @@ function Dashboard() {
   return (
     <div className="dashboard">
       <div className="dashboard-header">
-        <h1>Benvenuto, {user.username}! 🇮🇹</h1>
+        <h1>
+          <img src="/icons/italy.png" alt="Bandiera italiana" className="italy-flag-icon" />
+          Benvenuto, {user.username}!
+        </h1>
         <div className="user-stats">
           <div className="stat-card">
             <h3>Punteggio</h3>

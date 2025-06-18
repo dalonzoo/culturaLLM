@@ -41,7 +41,10 @@ function Login() {
   return (
     <div className="auth-container">
       <div className="auth-card">
-        <h2>Accedi a CulturaLLM 🇮🇹</h2>
+        <h2>
+          <img src="/icons/italy.png" alt="Bandiera italiana" className="italy-flag-icon" />
+          Accedi a CulturaLLM
+        </h2>
 
         {error && <div className="error-message">{error}</div>}
 

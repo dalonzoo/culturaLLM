@@ -18,7 +18,8 @@ function Navbar() {
     <nav className="navbar">
       <div className="nav-container">
         <Link to="/" className="nav-logo">
-          🇮🇹 CulturaLLM
+          <img src="/icons/italy.png" alt="Bandiera italiana" className="italy-flag-icon" />
+          CulturaLLM
         </Link>
         <button className="nav-hamburger" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Apri menu">
           <span className="hamburger-bar"></span>
@@ -163,6 +164,12 @@ function Navbar() {
         }
         .user-menu .logout-btn:hover {
           background: #f5f5f5;
+        }
+        .italy-flag-icon {
+          width: 24px;
+          height: 16px;
+          margin-right: 8px;
+          border-radius: 2px;
         }
       `}</style>
     </nav>
