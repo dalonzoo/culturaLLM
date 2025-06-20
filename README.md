@@ -129,16 +129,39 @@ Per eseguire il progetto in locale, è necessario avere Docker e Docker Compose 
 
 2. **Avviare i servizi con Docker Compose**:
    Il seguente comando costruirà le immagini Docker (se non già presenti) e avvierà tutti i container in modo orchestrato.
-   ```sh
-   docker-compose up --build
-   ```
-   L'opzione `--build` forza la ri-costruzione delle immagini, utile se sono stati modificati i file di dipendenza (es. `requirements.txt` o `package.json`).
+   
+   È possibile scegliere tra diversi modelli LLM utilizzando la variabile d'ambiente `OLLAMA_MODEL`:
 
-3. **Accedere all'applicazione**:
+   ```sh
+   # Usa gemma3:1b (default)
+   OLLAMA_MODEL=gemma3:1b docker-compose up -d
+
+   # Usa llama3.2:4b
+   OLLAMA_MODEL=llama3.2:4b docker-compose up -d
+
+   # Usa mistral:7b
+   OLLAMA_MODEL=mistral:7b docker-compose up -d
+
+   # Usa codellama:7b
+   OLLAMA_MODEL=codellama:7b docker-compose up -d
+   ```
+
+   L'opzione `--build` può essere aggiunta per forzare la ri-costruzione delle immagini, utile se sono stati modificati i file di dipendenza (es. `requirements.txt` o `package.json`):
+   ```sh
+   OLLAMA_MODEL=gemma3:1b docker-compose up --build
+   ```
+
+3. **Accesso al Database**:
+   Per accedere direttamente al database MariaDB nel container:
+   ```sh
+   docker exec -it culturallm_mariadb mysql -u root -prootpassword
+   ```
+
+4. **Accedere all'applicazione**:
    - **Frontend**: Aprire il browser e navigare all'indirizzo `http://localhost:3000`.
    - **Backend API Docs**: La documentazione interattiva dell'API (Swagger) è disponibile all'indirizzo `http://localhost:5001/docs`.
 
-4. **Fermare i servizi**:
+5. **Fermare i servizi**:
    Per fermare tutti i container, premere `CTRL+C` nel terminale dove `docker-compose` è in esecuzione, oppure eseguire da un altro terminale:
    ```sh
    docker-compose down

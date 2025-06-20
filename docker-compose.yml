@@ -101,7 +101,7 @@ services:
       - culturallm_network
     environment:
       - OLLAMA_HOST=http://ollama:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3:4b}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3:1b}
     entrypoint: ["/bin/bash"]
     command: >
       -c "
@@ -139,7 +139,7 @@ services:
       # Configurazione per connessione al database e al modello
       - DATABASE_URL=mysql+pymysql://culturallm_user:culturallm_pass@mariadb:3306/culturallm
       - OLLAMA_HOST=http://ollama:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3:4b}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3:1b}
       - PYTHONPATH=/app
     networks:
       - culturallm_network
