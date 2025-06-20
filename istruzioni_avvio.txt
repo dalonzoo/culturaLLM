@@ -1,12 +1,15 @@
 Avvio con modelli diversi:
-# Usa gemma3:2b
-OLLAMA_MODEL=gemma3:2b docker-compose up -d
+# Usa gemma3:1b
+OLLAMA_MODEL=gemma3:1b docker-compose up -d
 
-# Usa llama3.2:3b
-OLLAMA_MODEL=llama3.2:3b docker-compose up -d
+# Usa llama3.2:4b
+OLLAMA_MODEL=llama3.2:4b docker-compose up -d
 
 # Usa mistral:7b
 OLLAMA_MODEL=mistral:7b docker-compose up -d
 
 # Usa codellama:7b
 OLLAMA_MODEL=codellama:7b docker-compose up -d
+
+Accesso a MariaDb database nel container:
+docker exec -it culturallm_mariadb mysql -u root -prootpassword

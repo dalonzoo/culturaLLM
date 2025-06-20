@@ -272,35 +272,35 @@ async def validate_with_llm(
         prompt = f"""
         Sei un esperto di cultura italiana e il tuo compito è valutare una risposta a una domanda su questo tema.
 
-ISTRUZIONI IMPORTANTI:
-Devi fornire ESATTAMENTE il seguente formato, senza alcuna variazione, senza markdown, senza intestazioni, senza spiegazioni extra. Ogni campo deve apparire nell'ordine esatto, con etichette identiche e valori numerici nel formato richiesto. Non usare punti elenco, non saltare righe. Eventuali deviazioni sono considerate errore.
+        ISTRUZIONI IMPORTANTI:
+        Devi fornire ESATTAMENTE il seguente formato, senza alcuna variazione, senza markdown, senza intestazioni, senza spiegazioni extra. Ogni campo deve apparire nell'ordine esatto, con etichette identiche e valori numerici nel formato richiesto. Non usare punti elenco, non saltare righe. Eventuali deviazioni sono considerate errore.
 
-Domanda: {question.text}  
-Tema: {question.theme.name if question.theme else 'N/A'}  
-Risposta da valutare: {answer.text}  
-Tipo risposta: {'LLM' if is_llm else 'Umana'}
+        Domanda: {question.text}  
+        Tema: {question.theme.name if question.theme else 'N/A'}  
+        Risposta da valutare: {answer.text}  
+        Tipo risposta: {'LLM' if is_llm else 'Umana'}
 
-Valuta la risposta considerando i seguenti 4 criteri:
-1. Correttezza (accuratezza delle informazioni)
-2. Rilevanza (pertinenza rispetto alla domanda)
-3. Dettaglio (completezza della risposta)
-4. Chiarezza (comprensibilità e struttura)
+        Valuta la risposta considerando i seguenti 4 criteri:
+        1. Correttezza (accuratezza delle informazioni)
+        2. Rilevanza (pertinenza rispetto alla domanda)
+        3. Dettaglio (completezza della risposta)
+        4. Chiarezza (comprensibilità e struttura)
 
-Assegna:
-- Un punteggio da 0 a 5 per ciascun criterio
-- Un punteggio complessivo da 0 a 5
-- Un breve feedback (1-2 frasi) che giustifichi il punteggio
+        Assegna:
+        - Un punteggio da 0 a 10 per ciascun criterio (0 = completamente sbagliato/inappropriato)
+        - Un punteggio complessivo da 0 a 10 (0 = completamente sbagliato/inappropriato)
+        - Un breve feedback (1-2 frasi) che giustifichi il punteggio
 
-RISPOSTA FINALE – FORMATO OBBLIGATORIO:
-Correttezza: [0-5]  
-Rilevanza: [0-5]  
-Dettaglio: [0-5]  
-Chiarezza: [0-5]  
-Punteggio complessivo: [0-5]  
-Feedback: [breve spiegazione della valutazione]
+        RISPOSTA FINALE – FORMATO OBBLIGATORIO:
+        Correttezza: [0-10]  
+        Rilevanza: [0-10]  
+        Dettaglio: [0-10]  
+        Chiarezza: [0-10]  
+        Punteggio complessivo: [0-10]  
+        Feedback: [breve spiegazione della valutazione]
 
-NON includere altri commenti, spiegazioni, simboli o formattazioni. Segui il formato richiesto alla lettera.
-"""
+        NON includere altri commenti, spiegazioni, simboli o formattazioni. Segui il formato richiesto alla lettera.
+        """
         
         llm_response = llm_service.generate_answer(prompt)
         
@@ -320,7 +320,7 @@ NON includere altri commenti, spiegazioni, simboli o formattazioni. Segui il for
                 raise ValueError("Formato risposta non valido: manca il punteggio complessivo")
             
             score_str = score_lines[0].split(':')[1].strip()
-            match = re.search(r'([0-5])', score_str)
+            match = re.search(r'([0-9]|10)', score_str)
             if not match:
                 raise ValueError(f"Punteggio non valido nel testo: {score_str}")
             score = float(match.group(1))
@@ -334,12 +334,10 @@ NON includere altri commenti, spiegazioni, simboli o formattazioni. Segui il for
             if not feedback:
                 feedback = "Nessun feedback fornito"
             
-            normalized_score = (score / 5) * 10
-            
             llm_validation = LLMValidation(
                 answer_id=answer.id,
-                score=normalized_score,
-                is_correct=normalized_score >= 6,
+                score=score,  # Non serve più normalizzare
+                is_correct=score >= 6,
                 feedback=feedback
             )
             
@@ -424,19 +422,19 @@ async def validate_with_llm_text(
         4. Chiarezza (comprensibilità e struttura)
         
         Fornisci:
-        1. Un punteggio da 0 a 5 per ogni criterio (0 = completamente sbagliato/inappropriato)
-        2. Un punteggio complessivo da 0 a 5
+        1. Un punteggio da 0 a 10 per ogni criterio (0 = completamente sbagliato/inappropriato)
+        2. Un punteggio complessivo da 0 a 10
         3. Un breve feedback che spieghi la valutazione
         
         Formato di risposta richiesto:
-        Correttezza: [0-5]
-        Rilevanza: [0-5]
-        Dettaglio: [0-5]
-        Chiarezza: [0-5]
-        Punteggio complessivo: [0-5]
+        Correttezza: [0-10]
+        Rilevanza: [0-10]
+        Dettaglio: [0-10]
+        Chiarezza: [0-10]
+        Punteggio complessivo: [0-10]
         Feedback: [breve spiegazione]
         Non usare markdown o formattazioni particolari.
-        Rispetta esattamente il formato richiesto.Non sono ammessi errori.
+        Rispetta esattamente il formato richiesto. Non sono ammessi errori.
         Riporta quindi correttezza, rilevanza, dettaglio, chiarezza, punteggio complessivo e feedback.
         """
         llm_response = llm_service.generate_answer(prompt)
@@ -446,7 +444,7 @@ async def validate_with_llm_text(
             if not score_lines:
                 raise ValueError("Formato risposta non valido: manca il punteggio complessivo")
             score_str = score_lines[0].split(':')[1].strip()
-            match = re.search(r'([0-5])', score_str)
+            match = re.search(r'([0-9]|10)', score_str)
             if not match:
                 raise ValueError(f"Punteggio non valido nel testo: {score_str}")
             score = float(match.group(1))
@@ -456,14 +454,19 @@ async def validate_with_llm_text(
             feedback = feedback_lines[0].split(':')[1].strip()
             if not feedback:
                 feedback = "Nessun feedback fornito"
-            normalized_score = (score / 5) * 10
+            llm_validation = LLMValidation(
+                answer_id=0,
+                score=score,  # Non serve più normalizzare
+                is_correct=score >= 6,
+                feedback=feedback
+            )
             return ValidationResponse(
                 id=0,
                 answer_id=0,
                 validator_id=None,
-                score=normalized_score,
-                is_correct=normalized_score >= 6,
-                feedback=feedback,
+                score=llm_validation.score,
+                is_correct=llm_validation.is_correct,
+                feedback=llm_validation.feedback,
                 created_at=None
             )
         except Exception as e:
