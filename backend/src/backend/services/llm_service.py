@@ -1,31 +1,32 @@
 # Importazioni necessarie per il servizio LLM
-import requests  # Per le chiamate HTTP a Ollama
+import boto3 # Importa la libreria AWS SDK
 import os       # Per accedere alle variabili d'ambiente
 import json     # Per la gestione dei dati JSON
 from typing import Optional  # Per il type hinting
 
-# Configurazione del servizio Ollama tramite variabili d'ambiente
-# Se non specificate, usa i valori di default per lo sviluppo locale
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma2:2b")
+# Configurazione dell'endpoint SageMaker tramite variabili d'ambiente
+# Assicurati che queste variabili siano impostate nell'ambiente o in Docker
+SAGEMAKER_ENDPOINT_NAME = os.getenv("SAGEMAKER_ENDPOINT_NAME", "jumpstart-dft-hf-llm-gemma-2-2b-20250702-143618")
+AWS_REGION = os.getenv("AWS_REGION", "eu-north-1")
 
 class LLMService:
     """
-    Servizio per l'interazione con il modello linguistico Ollama.
-    Gestisce la generazione di risposte alle domande sulla cultura italiana.
+    Servizio per l'interazione con il modello linguistico su AWS SageMaker.
+    Gestisce la generazione di risposte e tag culturali.
     """
     
     def __init__(self):
         """
-        Inizializza il servizio LLM con l'host e il modello configurati.
-        Usa i valori delle variabili d'ambiente o i default se non specificati.
+        Inizializza il servizio LLM con il client SageMaker Runtime.
+        Le credenziali AWS verranno caricate automaticamente dalle variabili d'ambiente
+        o dal file di configurazione AWS CLI.
         """
-        self.host = OLLAMA_HOST
-        self.model = OLLAMA_MODEL
+        self.sagemaker_runtime = boto3.client("sagemaker-runtime", region_name=AWS_REGION)
+        self.endpoint_name = SAGEMAKER_ENDPOINT_NAME
     
     def generate_answer(self, question: str, cultural_context: str = "") -> str:
         """
-        Genera una risposta a una domanda culturale utilizzando il modello LLM.
+        Genera una risposta a una domanda culturale utilizzando il modello LLM su SageMaker.
         
         Args:
             question: La domanda posta dall'utente
@@ -48,49 +49,38 @@ class LLMService:
         """
         
         try:
-            # Chiamata API a Ollama per la generazione della risposta
-            response = requests.post(
-                f"{self.host}/api/generate",
-                json={
-                    "model": self.model,
-                    "prompt": prompt,
-                    "stream": False,  # Risposta completa, non streaming
-                    "options": {
-                        "temperature": 0.7,    # Controllo della creatività (0.0-1.0)
-                        "top_p": 0.9,          # Sampling per varietà nelle risposte
-                        "max_tokens": 200,      # Lunghezza massima della risposta
-                        #"stop": ["\n\n"]       # Ferma la generazione ai doppi newline
-                    }
-                },
-                timeout=120,  # Timeout della richiesta in secondi
+            # Payload per l'endpoint SageMaker (formato per Llama/Gemma)
+            payload = {
+                "inputs": prompt,
+                "parameters": {
+                    "max_new_tokens": 200,      # Lunghezza massima della risposta
+                    "top_p": 0.9,          # Sampling per varietà nelle risposte
+                    "temperature": 0.7     # Controllo della creatività (0.0-1.0)
+                }
+            }
+            
+            # Chiamata all'endpoint SageMaker
+            response = self.sagemaker_runtime.invoke_endpoint(
+                EndpointName=self.endpoint_name,
+                ContentType="application/json",
+                Body=json.dumps(payload)
             )
-            response.raise_for_status()  # Solleva eccezione per errori HTTP
             
             # Estrae e pulisce la risposta dal JSON
-            result = response.json()
-            response_text = result.get("response", "").strip()
-            # Rimuove gli asterischi dalla risposta
+            result = json.loads(response["Body"].read().decode("utf-8"))
+            
+            # Assumiamo che la risposta sia nel formato [{"generated_text": "..."}]
+            response_text = result[0]["generated_text"].strip()
+            
+            # Rimuove gli asterischi dalla risposta (se presenti)
             response_text = response_text.replace('*', '')
             return response_text
             
-        except requests.exceptions.RequestException as e:
-            # Gestione degli errori di rete o del servizio
-            print(f"Error calling LLM: {e}")
+        except Exception as e:
+            # Gestione degli errori durante l'invocazione dell'endpoint
+            print(f"Error calling SageMaker LLM: {e}")
             return "Mi dispiace, non riesco a rispondere in questo momento."
     
-    def is_available(self) -> bool:
-        """
-        Verifica se il servizio LLM è disponibile e risponde.
-        
-        Returns:
-            True se il servizio è attivo e risponde, False altrimenti
-        """
-        try:
-            response = requests.get(f"{self.host}/api/tags", timeout=10)
-            return response.status_code == 200
-        except:
-            return False
-
     def generate_tag(self, question: str) -> str:
         """
         Genera un tag riassuntivo (max 3 parole) per una domanda usando il modello LLM.
@@ -106,29 +96,49 @@ class LLMService:
         Cerca di usare parole che sono utilizzate già nella affermazione senza crearne altre.
         Il tag deve essere composto da massimo 3 parole, ma usa meno parole possibile (preferibilmente una o due parole, solo raramente tre se strettamente necessario).
         Il tag deve essere sintetico, rappresentativo e privo di spiegazioni o punteggiatura.
-        Rispondi esclusivamente con il tag, senza testo aggiuntivo.
+        Rispondi esclusivamente con il tag (massimo 3 parole), SENZA alcun testo aggiuntivo, introduzione o punteggiatura finale. SOLO il TAG.
         Affermazione: {question}
         """
         try:
-            response = requests.post(
-                f"{self.host}/api/generate",
-                json={
-                    "model": self.model,
-                    "prompt": prompt,
-                    "stream": False,
-                    "options": {
-                        "temperature": 0.3,
-                        "top_p": 0.8,
-                        "max_tokens": 10
-                    }
-                },
-                timeout=60,
+            # Payload per l'endpoint SageMaker (formato per Llama/Gemma)
+            payload = {
+                "inputs": prompt,
+                "parameters": {
+                    "max_new_tokens": 15,  # Aumento leggermente per lasciare spazio
+                    "top_p": 0.8,
+                    "temperature": 0.3
+                }
+            }
+            
+            # Chiamata all'endpoint SageMaker
+            response = self.sagemaker_runtime.invoke_endpoint(
+                EndpointName=self.endpoint_name,
+                ContentType="application/json",
+                Body=json.dumps(payload)
             )
-            response.raise_for_status()
-            result = response.json()
-            return result.get("response", "").strip()
-        except requests.exceptions.RequestException as e:
-            print(f"Error calling LLM for tag: {e}")
+            
+            # Estrae e pulisce la risposta dal JSON
+            result = json.loads(response["Body"].read().decode("utf-8"))
+            
+            # Assumiamo che la risposta sia nel formato [{"generated_text": "..."}]
+            response_text = result[0]["generated_text"].strip()
+            
+            # Rimuove gli asterischi dalla risposta (se presenti)
+            response_text = response_text.replace('*', '')
+
+            # Safeguard: Tronca il tag per assicurarti che non superi la lunghezza della colonna (es. 100 caratteri)
+            if len(response_text) > 90: # Lascio un piccolo buffer
+                response_text = response_text[:90]
+                # Tenta di troncare all'ultima parola completa per una migliore leggibilità
+                last_space = response_text.rfind(' ')
+                if last_space != -1:
+                    response_text = response_text[:last_space]
+                response_text = response_text.strip()
+
+            return response_text
+            
+        except Exception as e:
+            print(f"Error calling SageMaker LLM for tag: {e}")
             return "Tag non disponibile"
 
 # Istanza globale del servizio

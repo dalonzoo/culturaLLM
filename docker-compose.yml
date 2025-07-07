@@ -67,61 +67,6 @@ services:
         exit 0;
       '
 
-  # Servizio Ollama - Gestisce il modello di linguaggio
-  ollama:
-    image: ollama/ollama:latest
-    container_name: culturallm_ollama
-    ports:
-      - "11434:11434"  # Porta per le richieste API al modello
-    volumes:
-      # Volume per la persistenza dei modelli scaricati
-      - ollama_data:/root/.ollama
-    networks:
-      - culturallm_network
-    restart: always
-    healthcheck:
-      # Verifica che il servizio Ollama sia operativo
-      test: ["CMD", "ollama", "list"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-      start_period: 30s
-
-  # Servizio per il download del modello - Assicura che il modello sia disponibile
-  ollama_model_downloader:
-    image: ollama/ollama:latest
-    container_name: culturallm_ollama_downloader
-    depends_on:
-      # Attende che Ollama sia operativo prima di scaricare il modello
-      ollama:
-        condition: service_healthy
-    volumes:
-      - ollama_data:/root/.ollama
-    networks:
-      - culturallm_network
-    environment:
-      - OLLAMA_HOST=http://ollama:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3:1b}
-    entrypoint: ["/bin/bash"]
-    command: >
-      -c "
-        # Script che verifica la presenza del modello e lo scarica se necessario
-        echo 'Attendo che Ollama sia disponibile...';
-        until OLLAMA_HOST=http://ollama:11434 ollama list > /dev/null 2>&1; do
-          echo 'Ollama non ancora pronto, attendo...';
-          sleep 2;
-        done;
-        echo 'Ollama pronto, verifico se il modello $OLLAMA_MODEL esiste già...';
-        if OLLAMA_HOST=http://ollama:11434 ollama list | grep -q '$OLLAMA_MODEL'; then
-          echo 'Modello $OLLAMA_MODEL già presente, skip download.';
-        else
-          echo 'Scarico il modello $OLLAMA_MODEL...';
-          OLLAMA_HOST=http://ollama:11434 ollama pull $OLLAMA_MODEL;
-          echo 'Modello $OLLAMA_MODEL scaricato con successo!';
-        fi;
-        exit 0;
-      "
-
   # Backend FastAPI - Gestisce la logica dell'applicazione
   backend:
     build:
@@ -130,17 +75,17 @@ services:
     ports:
       - "5001:5000"  # Porta esposta per le richieste API
     depends_on:
-      # Attende che database e modello siano pronti
+      # Attende che il database sia pronto
       db_init:
         condition: service_completed_successfully
-      ollama_model_downloader:
-        condition: service_completed_successfully
     environment:
-      # Configurazione per connessione al database e al modello
+      # Configurazione per connessione al database e a SageMaker
       - DATABASE_URL=mysql+pymysql://culturallm_user:culturallm_pass@mariadb:3306/culturallm
-      - OLLAMA_HOST=http://ollama:11434
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3:1b}
-      - PYTHONPATH=/app
+      - SAGEMAKER_ENDPOINT_NAME=jumpstart-dft-hf-llm-gemma-2-2b-20250702-143618
+      - AWS_REGION=eu-north-1
+    env_file:
+      - ./backend/.env
+      # - AWS_SESSION_TOKEN=YOUR_AWS_SESSION_TOKEN # DecCommenta se usi credenziali temporanee
     networks:
       - culturallm_network
     healthcheck:
@@ -151,17 +96,7 @@ services:
       retries: 5
       start_period: 15s
     restart: always
-    command: >
-      sh -c "
-        # Script che attende la disponibilità del modello prima di avviare il backend
-        echo 'Verifico che il modello $OLLAMA_MODEL sia disponibile in Ollama...';
-        until curl -sf http://ollama:11434/api/tags | grep -q '$OLLAMA_MODEL'; do
-          echo 'In attesa del modello $OLLAMA_MODEL...';
-          sleep 3;
-        done;
-        echo 'Modello $OLLAMA_MODEL disponibile! Avvio backend...';
-        cd /app && uvicorn backend.main:app --host 0.0.0.0 --port 5000 --reload
-      "
+    command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "5000", "--reload"]
 
   # Frontend React - Interfaccia utente dell'applicazione
   frontend:
@@ -191,8 +126,4 @@ volumes:
   # Volume per i dati del database
   culturallm_mariadb_data:
     name: culturallm_mariadb_data
-    driver: local
-  # Volume per i modelli Ollama
-  ollama_data:
-    name: culturallm_ollama_data
     driver: local
