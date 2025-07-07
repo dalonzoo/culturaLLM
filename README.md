@@ -1,168 +1,168 @@
 # CulturaLLM
 
-CulturaLLM è una piattaforma web interattiva progettata per esplorare e approfondire la cultura italiana attraverso un sistema di domande e risposte gamificato. L'applicazione sfrutta un Large Language Model (LLM) per generare risposte che vengono confrontate e validate dagli utenti insieme a quelle fornite da altri partecipanti, creando un ecosistema di apprendimento collaborativo e validazione comunitaria.
+CulturaLLM is an interactive web platform designed to explore and deepen Italian culture through a gamified question-and-answer system. The application leverages a Large Language Model (LLM) to generate responses that are compared and validated by users alongside those provided by other participants, creating a collaborative learning and community validation ecosystem.
 
-## Architettura
+## Architecture
 
-Il progetto è basato su un'architettura a microservizi gestita tramite Docker Compose. Questa scelta garantisce modularità, scalabilità e facilità di deployment.
+The project is based on a microservices architecture managed via Docker Compose. This choice ensures modularity, scalability, and ease of deployment.
 
 ```mermaid
 graph TD
-    subgraph "Utente"
+    subgraph "User"
         A[Browser]
     end
 
-    subgraph "Infrastruttura Docker"
+    subgraph "Docker Infrastructure"
         B(Frontend) -- HTTP Request --> C(Backend)
         C -- TCP/IP --> D{MariaDB}
         C -- HTTP Request --> E{Ollama}
     end
 
-    A -- Interazione --> B
+    A -- Interaction --> B
 
-    subgraph "Servizi di Supporto"
-        F(DB Initializer) -- Inizializza --> D
-        G(Model Downloader) -- Scarica Modello --> E
+    subgraph "Support Services"
+        F(DB Initializer) -- Initializes --> D
+        G(Model Downloader) -- Downloads Model --> E
     end
 ```
 
-### Servizi Principali
-- **Frontend**: Applicazione React.js che fornisce l'interfaccia utente.
-- **Backend**: API server basato su FastAPI (Python) che gestisce tutta la logica di business.
-- **MariaDB**: Database relazionale per la persistenza dei dati (utenti, domande, risposte, validazioni).
-- **Ollama**: Serve il modello linguistico (es. `gemma3:1b`) per la generazione di risposte da parte dell'IA.
+### Main Services
+- **Frontend**: React.js application that provides the user interface.
+- **Backend**: FastAPI (Python) based API server that handles all business logic.
+- **MariaDB**: Relational database for data persistence (users, questions, answers, validations).
+- **Ollama**: Serves the language model (e.g., `gemma3:1b`) for AI response generation.
 
-### Servizi di Supporto
-- **db_init**: Container di servizio che inizializza lo schema del database al primo avvio, se vuoto.
-- **ollama_model_downloader**: Container di servizio che scarica il modello LLM richiesto se non è già presente localmente.
+### Support Services
+- **db_init**: Service container that initializes the database schema on first boot, if empty.
+- **ollama_model_downloader**: Service container that downloads the required LLM model if it's not already present locally.
 
 ---
 
 ## Backend (Focus: 90%)
 
-Il backend è il cuore del sistema e gestisce la logica applicativa, l'interazione con il database e l'integrazione con il modello LLM.
+The backend is the heart of the system and manages application logic, database interaction, and integration with the LLM model.
 
-### Tecnologie Utilizzate
-- **Linguaggio**: Python 3.11+
-- **Web Framework**: **FastAPI** per la creazione di API performanti e moderne, con documentazione automatica (Swagger UI & ReDoc).
-- **ORM**: **SQLAlchemy** per l'interazione con il database MariaDB, garantendo un mapping efficiente tra oggetti Python e tabelle relazionali.
-- **Modelli Dati**: **Pydantic** per la validazione dei dati, la serializzazione e la definizione degli schemi API.
-- **Autenticazione**: Gestita tramite token **JWT (JSON Web Tokens)**, con hashing delle password utilizzando `passlib`.
-- **Integrazione LLM**: Tramite richieste HTTP dirette al servizio Ollama con la libreria `requests`.
-- **Containerizzazione**: **Docker** per l'impacchettamento dell'applicazione e delle sue dipendenze.
+### Technologies Used
+- **Language**: Python 3.11+
+- **Web Framework**: **FastAPI** for creating high-performance and modern APIs, with automatic documentation (Swagger UI & ReDoc).
+- **ORM**: **SQLAlchemy** for interaction with the MariaDB database, ensuring efficient mapping between Python objects and relational tables.
+- **Data Models**: **Pydantic** for data validation, serialization, and API schema definition.
+- **Authentication**: Managed via **JWT (JSON Web Tokens)**, with password hashing using `passlib`.
+- **LLM Integration**: Via direct HTTP requests to the Ollama service using the `requests` library.
+- **Containerization**: **Docker** for packaging the application and its dependencies.
 
-### Struttura del Progetto
+### Project Structure
 ```
 backend/src/backend/
-├── main.py             # Entry point dell'applicazione FastAPI
+├── main.py             # Entry point of the FastAPI application
 ├── models/
-│   └── schemas.py      # Modelli SQLAlchemy e schemi Pydantic
+│   └── schemas.py      # SQLAlchemy models and Pydantic schemas
 ├── routers/
-│   ├── auth.py         # Endpoint per autenticazione (login, registrazione)
-│   ├── question.py     # Endpoint per la gestione delle domande
-│   ├── answer.py       # Endpoint per la sottomissione delle risposte
-│   ├── validate.py     # Endpoint per la validazione delle risposte
-│   └── leaderboard.py  # Endpoint per la classifica utenti
+│   ├── auth.py         # Endpoint for authentication (login, registration)
+│   ├── question.py     # Endpoint for question management
+│   ├── answer.py       # Endpoint for submitting answers
+│   ├── validate.py     # Endpoint for answer validation
+│   └── leaderboard.py  # Endpoint for user leaderboard
 └── services/
-    ├── database.py     # Configurazione e sessioni del database
-    └── llm_service.py  # Logica per l'interazione con Ollama
+    ├── database.py     # Database configuration and sessions
+    └── llm_service.py  # Logic for interacting with Ollama
 ```
 
-### Endpoint API Principali
-Il backend espone una serie di endpoint RESTful per gestire il flusso dell'applicazione:
-- `POST /api/auth/register`: Registrazione di un nuovo utente.
-- `POST /api/auth/login`: Login di un utente e generazione di un token JWT.
-- `GET /api/questions/random`: Ottiene una domanda casuale a cui rispondere.
-- `POST /api/questions/`: Crea una nuova domanda (funzionalità per admin/moderatori).
-- `POST /api/answers/`: Invia una risposta (umana o generata da AI) a una domanda.
-- `GET /api/validate/pending`: Ottiene una coppia di risposte (umana e AI) da validare.
-- `POST /api/validate/`: Invia la validazione (punteggio e feedback) per una risposta.
-- `GET /api/leaderboard/`: Ottiene la classifica degli utenti basata sui loro punteggi.
+### Main API Endpoints
+The backend exposes a series of RESTful endpoints to manage the application flow:
+- `POST /api/auth/register`: User registration.
+- `POST /api/auth/login`: User login and JWT token generation.
+- `GET /api/questions/random`: Gets a random question to answer.
+- `POST /api/questions/`: Creates a new question (admin/moderator functionality).
+- `POST /api/answers/`: Submits an answer (human or AI-generated) to a question.
+- `GET /api/validate/pending`: Gets a pair of answers (human and AI) to validate.
+- `POST /api/validate/`: Submits validation (score and feedback) for an answer.
+- `GET /api/leaderboard/`: Gets the user leaderboard based on their scores.
 
-### Logica di Business Chiave
+### Key Business Logic
 
-#### Generazione Risposta AI (`llm_service.py`)
-Quando un utente risponde a una domanda, il backend invia una richiesta al servizio Ollama. Il prompt viene costruito dinamicamente per includere il contesto culturale e la domanda stessa, istruendo l'LLM a fornire una risposta concisa e pertinente.
+#### AI Answer Generation (`llm_service.py`)
+When a user answers a question, the backend sends a request to the Ollama service. The prompt is dynamically constructed to include the cultural context and the question itself, instructing the LLM to provide a concise and relevant answer.
 
-#### Validazione delle Risposte (`validate.py`)
-Questo è un processo centrale. Gli utenti (validatori) ricevono una coppia di risposte (una umana, una AI) per la stessa domanda. Attraverso l'interfaccia, assegnano un punteggio che il backend registra. Questo punteggio contribuisce allo score dell'utente che ha fornito la risposta e all'affidabilità generale del modello.
+#### Answer Validation (`validate.py`)
+This is a central process. Users (validators) receive a pair of answers (one human, one AI) for the same question. Through the interface, they assign a score that the backend records. This score contributes to the score of the user who provided the answer and to the general reliability of the model.
 
-### Dipendenze Chiave (`requirements.txt`)
-- `fastapi`: Framework web.
-- `uvicorn`: ASGI server per FastAPI.
-- `sqlalchemy`, `pymysql`: Interazione con MariaDB.
-- `python-jose`, `passlib[bcrypt]`: Gestione JWT e hashing password.
-- `requests`: Per le chiamate API a Ollama.
-- `pydantic`: Validazione dati.
+### Key Dependencies (`requirements.txt`)
+- `fastapi`: Web framework.
+- `uvicorn`: ASGI server for FastAPI.
+- `sqlalchemy`, `pymysql`: Interaction with MariaDB.
+- `python-jose`, `passlib[bcrypt]`: JWT management and password hashing.
+- `requests`: For API calls to Ollama.
+- `pydantic`: Data validation.
 
 ---
 
 ## Frontend (Focus: 10%)
 
-L'interfaccia utente è un'applicazione Single Page Application (SPA) costruita per essere reattiva e intuitiva.
+The user interface is a Single Page Application (SPA) built to be responsive and intuitive.
 
-### Tecnologie Utilizzate
-- **Libreria UI**: **React.js** (v18) con functional components e Hooks.
-- **Routing**: **React Router DOM** per la navigazione tra le diverse sezioni (login, dashboard, validazione, etc.).
-- **Comunicazione API**: **Axios** per effettuare chiamate HTTP al backend FastAPI.
-- **Styling**: CSS puro con una struttura BEM-like per la manutenibilità.
+### Technologies Used
+- **UI Library**: **React.js** (v18) with functional components and Hooks.
+- **Routing**: **React Router DOM** for navigation between different sections (login, dashboard, validation, etc.).
+- **API Communication**: **Axios** for making HTTP calls to the FastAPI backend.
+- **Styling**: Pure CSS with a BEM-like structure for maintainability.
 - **Build Tool**: `react-scripts` (Create React App).
 
-### Componenti Principali
-- **`Login`/`Register`**: Gestiscono l'autenticazione utente.
-- **`Dashboard`**: Pagina principale dopo il login, punto di accesso alle funzioni principali.
-- **`AnswerQuestion`**: Componente per visualizzare una domanda e inviare una risposta.
-- **`ValidateAnswers`**: Interfaccia di validazione con la progress bar dinamica per assegnare un giudizio qualitativo.
-- **`Leaderboard`**: Visualizza la classifica degli utenti.
+### Main Components
+- **`Login`/`Register`**: Handle user authentication.
+- **`Dashboard`**: Main page after login, access point to main functions.
+- **`AnswerQuestion`**: Component to display a question and submit an answer.
+- **`ValidateAnswers`**: Validation interface with dynamic progress bar to assign a qualitative judgment.
+- **`Leaderboard`**: Displays the user leaderboard.
 
 ---
 
-## Come Avviare il Progetto
+## How to Start the Project
 
-Per eseguire il progetto in locale, è necessario avere Docker e Docker Compose installati.
+To run the project locally, you need to have Docker and Docker Compose installed.
 
-1. **Clonare il repository**:
+1. **Clone the repository**:
    ```sh
-   git clone <URL_DEL_REPOSITORY>
-   cd <NOME_DELLA_CARTELLA>
+   git clone <REPOSITORY_URL>
+   cd <FOLDER_NAME>
    ```
 
-2. **Avviare i servizi con Docker Compose**:
-   Il seguente comando costruirà le immagini Docker (se non già presenti) e avvierà tutti i container in modo orchestrato.
+2. **Start services with Docker Compose**:
+   The following command will build Docker images (if not already present) and start all containers in an orchestrated manner.
    
-   È possibile scegliere tra diversi modelli LLM utilizzando la variabile d'ambiente `OLLAMA_MODEL`:
+   You can choose between different LLM models using the `OLLAMA_MODEL` environment variable:
 
    ```sh
-   # Usa gemma3:1b (default)
+   # Use gemma3:1b (default)
    OLLAMA_MODEL=gemma3:1b docker-compose up -d
 
-   # Usa llama3.2:4b
+   # Use llama3.2:4b
    OLLAMA_MODEL=llama3.2:4b docker-compose up -d
 
-   # Usa mistral:7b
+   # Use mistral:7b
    OLLAMA_MODEL=mistral:7b docker-compose up -d
 
-   # Usa codellama:7b
+   # Use codellama:7b
    OLLAMA_MODEL=codellama:7b docker-compose up -d
    ```
 
-   L'opzione `--build` può essere aggiunta per forzare la ri-costruzione delle immagini, utile se sono stati modificati i file di dipendenza (es. `requirements.txt` o `package.json`):
+   The `--build` option can be added to force rebuilding images, useful if dependency files (e.g., `requirements.txt` or `package.json`) have been modified:
    ```sh
    OLLAMA_MODEL=gemma3:1b docker-compose up --build
    ```
 
-3. **Accesso al Database**:
-   Per accedere direttamente al database MariaDB nel container:
+3. **Database Access**:
+   To directly access the MariaDB database in the container:
    ```sh
    docker exec -it culturallm_mariadb mysql -u root -prootpassword
    ```
 
-4. **Accedere all'applicazione**:
-   - **Frontend**: Aprire il browser e navigare all'indirizzo `http://localhost:3000`.
-   - **Backend API Docs**: La documentazione interattiva dell'API (Swagger) è disponibile all'indirizzo `http://localhost:5001/docs`.
+4. **Access the application**:
+   - **Frontend**: Open your browser and navigate to `http://localhost:3000`.
+   - **Backend API Docs**: The interactive API documentation (Swagger) is available at `http://localhost:5001/docs`.
 
-5. **Fermare i servizi**:
-   Per fermare tutti i container, premere `CTRL+C` nel terminale dove `docker-compose` è in esecuzione, oppure eseguire da un altro terminale:
+5. **Stop services**:
+   To stop all containers, press `CTRL+C` in the terminal where `docker-compose` is running, or execute from another terminal:
    ```sh
    docker-compose down
    ``` 
