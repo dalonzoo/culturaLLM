@@ -126,28 +126,30 @@ async def generate_llm_question(
     Genera una nuova domanda sulla cultura italiana basata su un tema specifico.
     Restituisce solo il testo e il tag, NON salva nulla nel database.
     """
+    import requests
     # Verifica che il tema esista
     theme = db.query(CulturalTheme).filter(CulturalTheme.id == theme_id).first()
     if not theme:
         raise HTTPException(status_code=404, detail="Theme not found")
-    # Genera la domanda usando il servizio LLM
-    prompt = f"""
-    Genera una domanda semplice e veloce sulla cultura italiana riguardante il tema: {theme.name}
-    La domanda deve essere:
-    - Chiara e concisa
-    - Specifica per il tema {theme.name}
-    - Adatta a un quiz sulla cultura italiana
-    - Non troppo lunga
-    Formato richiesto: solo la domanda, senza spiegazioni aggiuntive.
-    """
+    # Chiamata all'endpoint esterno per generare la domanda
     try:
-        question_text = llm_service.generate_answer(prompt)
+        response = requests.post(
+            "https://danieledalonzon03--llama-question-generator-enhanced-fas-bc5f89.modal.run/generate_question",
+            headers={"Content-Type": "application/json"},
+            json={"argument": theme.name}
+        )
+        if response.status_code != 200:
+            raise Exception(f"Errore endpoint esterno: {response.status_code} - {response.text}")
+        data = response.json()
+        question_text = data.get("question_generated")
+        if not question_text:
+            raise Exception("Risposta dell'endpoint non valida: manca 'question_generated'")
         tag = llm_service.generate_tag(question_text.strip())
         return {"text": question_text.strip(), "tag": tag}
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error generating question: {str(e)}"
+            detail=f"Errore generazione domanda tramite endpoint esterno: {str(e)}"
         )
 
 @router.post("/tag", response_model=TagResponse)
