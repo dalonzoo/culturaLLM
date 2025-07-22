@@ -86,7 +86,6 @@ services:
       timeout: 3s
       retries: 5
       start_period: 30s
-
   # Servizio per il download del modello - Assicura che il modello sia disponibile
   ollama_model_downloader:
     image: ollama/ollama:latest
@@ -111,13 +110,13 @@ services:
           echo 'Ollama non ancora pronto, attendo...';
           sleep 2;
         done;
-        echo 'Ollama pronto, verifico se il modello $OLLAMA_MODEL esiste già...';
-        if OLLAMA_HOST=http://ollama:11434 ollama list | grep -q '$OLLAMA_MODEL'; then
-          echo 'Modello $OLLAMA_MODEL già presente, skip download.';
+        echo 'Ollama pronto, verifico se il modello \$${OLLAMA_MODEL} esiste già...';
+        if OLLAMA_HOST=http://ollama:11434 ollama list | grep -q \"\$${OLLAMA_MODEL}\"; then
+          echo 'Modello \$${OLLAMA_MODEL} già presente, skip download.';
         else
-          echo 'Scarico il modello $OLLAMA_MODEL...';
-          OLLAMA_HOST=http://ollama:11434 ollama pull $OLLAMA_MODEL;
-          echo 'Modello $OLLAMA_MODEL scaricato con successo!';
+          echo 'Scarico il modello \$${OLLAMA_MODEL}...';
+          OLLAMA_HOST=http://ollama:11434 ollama pull \$${OLLAMA_MODEL};
+          echo 'Modello \$${OLLAMA_MODEL} scaricato con successo!';
         fi;
         exit 0;
       "
@@ -135,8 +134,7 @@ services:
         condition: service_completed_successfully
       ollama_model_downloader:
         condition: service_completed_successfully
-    environment:
-      # Configurazione per connessione al database e al modello
+    environment:      # Configurazione per connessione al database e al modello
       - DATABASE_URL=mysql+pymysql://culturallm_user:culturallm_pass@mariadb:3306/culturallm
       - OLLAMA_HOST=http://ollama:11434
       - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3:1b}
@@ -154,12 +152,6 @@ services:
     command: >
       sh -c "
         # Script che attende la disponibilità del modello prima di avviare il backend
-        echo 'Verifico che il modello $OLLAMA_MODEL sia disponibile in Ollama...';
-        until curl -sf http://ollama:11434/api/tags | grep -q '$OLLAMA_MODEL'; do
-          echo 'In attesa del modello $OLLAMA_MODEL...';
-          sleep 3;
-        done;
-        echo 'Modello $OLLAMA_MODEL disponibile! Avvio backend...';
         cd /app && uvicorn backend.main:app --host 0.0.0.0 --port 5000 --reload
       "
 
