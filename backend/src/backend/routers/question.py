@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Body
 from sqlalchemy.orm import Session
 from typing import List
 import random
+import requests
 
 from backend.services.database import get_db
 from backend.services.llm_service import llm_service
@@ -13,6 +14,8 @@ from backend.models.schemas import (
 from backend.routers.auth import get_current_user
 
 router = APIRouter()
+
+MODAL_APP_URL = "https://danieledalonzon03--culturallm-nlp-server-fastapi-app.modal.run"
 
 async def generate_llm_answer_background(question_id: int, db: Session):
     """Background task to generate LLM answer"""
@@ -59,13 +62,15 @@ async def create_question(
     theme = db.query(CulturalTheme).filter(CulturalTheme.id == question.theme_id).first()
     if not theme:
         raise HTTPException(status_code=404, detail="Theme not found")
-    # Genera il tag
-    tag = llm_service.generate_tag(question.text)
+    
+    # Genera il tag utilizzando il nuovo servizio
+    tag_text = llm_service.generate_tag(question.text)
+    
     db_question = Question(
         text=question.text,
         creator_id=current_user.id,
         theme_id=question.theme_id,
-        tag=tag
+        tag=tag_text  # Salva il tag generato
     )
     db.add(db_question)
     db.commit()
@@ -126,30 +131,41 @@ async def generate_llm_question(
     Genera una nuova domanda sulla cultura italiana basata su un tema specifico.
     Restituisce solo il testo e il tag, NON salva nulla nel database.
     """
-    import requests
     # Verifica che il tema esista
     theme = db.query(CulturalTheme).filter(CulturalTheme.id == theme_id).first()
     if not theme:
         raise HTTPException(status_code=404, detail="Theme not found")
+    
     # Chiamata all'endpoint esterno per generare la domanda
     try:
         response = requests.post(
-            "https://danieledalonzon03--llama-question-generator-enhanced-fas-bc5f89.modal.run/generate_question",
+            f"{MODAL_APP_URL}/tasks/yellow",
             headers={"Content-Type": "application/json"},
-            json={"argument": theme.name}
+            json={"argument": theme.name},
+            timeout=30
         )
-        if response.status_code != 200:
-            raise Exception(f"Errore endpoint esterno: {response.status_code} - {response.text}")
+        response.raise_for_status() # Lancia un'eccezione per status code non 2xx
+        
         data = response.json()
         question_text = data.get("question_generated")
+        
         if not question_text:
             raise Exception("Risposta dell'endpoint non valida: manca 'question_generated'")
+        
+        # Genera il tag per la nuova domanda
         tag = llm_service.generate_tag(question_text.strip())
+        
         return {"text": question_text.strip(), "tag": tag}
+        
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Errore durante la chiamata all'endpoint di generazione domanda: {str(e)}"
+        )
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Errore generazione domanda tramite endpoint esterno: {str(e)}"
+            detail=f"Errore nell'elaborazione della risposta dall'endpoint esterno: {str(e)}"
         )
 
 @router.post("/tag", response_model=TagResponse)

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, UniqueConstraint
-from typing import List
+from typing import List, Optional
 from sqlalchemy.sql import func
 from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey
 import re
@@ -267,108 +267,53 @@ async def validate_with_llm(
     
     validations = []
     
-    # Funzione helper per validare una singola risposta
-    def validate_single_answer(answer, is_llm=False):
-        prompt = f"""
-        Sei un esperto di cultura italiana e il tuo compito è valutare una risposta a una domanda su questo tema.
+    # Funzione helper per validare una singola risposta con il nuovo servizio
+    def validate_single_answer(answer_to_validate, is_llm=False):
+        validation_data = llm_service.validate_answer(
+            question=question.text,
+            answer=answer_to_validate.text,
+            feedback=""  # Feedback vuoto come da specifica
+        )
 
-        ISTRUZIONI IMPORTANTI:
-        Devi fornire ESATTAMENTE il seguente formato, senza alcuna variazione, senza markdown, senza intestazioni, senza spiegazioni extra. Ogni campo deve apparire nell'ordine esatto, con etichette identiche e valori numerici nel formato richiesto. Non usare punti elenco, non saltare righe. Eventuali deviazioni sono considerate errore.
-
-        Domanda: {question.text}  
-        Tema: {question.theme.name if question.theme else 'N/A'}  
-        Risposta da valutare: {answer.text}  
-        Tipo risposta: {'LLM' if is_llm else 'Umana'}
-
-        Valuta la risposta considerando i seguenti 4 criteri:
-        1. Correttezza (accuratezza delle informazioni)
-        2. Rilevanza (pertinenza rispetto alla domanda)
-        3. Dettaglio (completezza della risposta)
-        4. Chiarezza (comprensibilità e struttura)
-
-        Assegna:
-        - Un punteggio da 0 a 10 per ciascun criterio (0 = completamente sbagliato/inappropriato)
-        - Un punteggio complessivo da 0 a 10 (0 = completamente sbagliato/inappropriato)
-        - Un breve feedback (1-2 frasi) che giustifichi il punteggio
-
-        RISPOSTA FINALE – FORMATO OBBLIGATORIO:
-        Correttezza: [0-10]  
-        Rilevanza: [0-10]  
-        Dettaglio: [0-10]  
-        Chiarezza: [0-10]  
-        Punteggio complessivo: [0-10]  
-        Feedback: [breve spiegazione della valutazione]
-
-        NON includere altri commenti, spiegazioni, simboli o formattazioni. Segui il formato richiesto alla lettera.
-        """
-        
-        llm_response = llm_service.generate_answer(prompt)
-        
-        try:
-            # Dividi la risposta in righe e rimuovi spazi vuoti
-            lines = [line.strip() for line in llm_response.split('\n') if line.strip()]
-            print("--------------------------------")
-            print("--------------------------------")
-            print("Domanda valutata: ", question.text)
-            print("Risposta da valutare: ", answer.text)
-            print("risposta ricevuta LLM: ", lines)
-            print("--------------------------------")
-            print("--------------------------------")
-            # Cerca il punteggio complessivo
-            score_lines = [line for line in lines if 'Punteggio complessivo:' in line]
-            if not score_lines:
-                raise ValueError("Formato risposta non valido: manca il punteggio complessivo")
-            
-            score_str = score_lines[0].split(':')[1].strip()
-            match = re.search(r'([0-9]|10)', score_str)
-            if not match:
-                raise ValueError(f"Punteggio non valido nel testo: {score_str}")
-            score = float(match.group(1))
-            
-            # Cerca il feedback
-            feedback_lines = [line for line in lines if 'Feedback:' in line]
-            if not feedback_lines:
-                raise ValueError("Formato risposta non valido: manca il feedback")
-            
-            feedback = feedback_lines[0].split(':')[1].strip()
-            if not feedback:
-                feedback = "Nessun feedback fornito"
-            
-            llm_validation = LLMValidation(
-                answer_id=answer.id,
-                score=score,  # Non serve più normalizzare
-                is_correct=score >= 6,
-                feedback=feedback
+        if not validation_data or "score" not in validation_data:
+            raise HTTPException(
+                status_code=500,
+                detail="Errore durante la validazione con il servizio esterno: risposta non valida."
             )
-            
-            db.add(llm_validation)
-            db.commit()
-            db.refresh(llm_validation)
-            
-            return ValidationResponse(
-                id=llm_validation.id,
-                answer_id=llm_validation.answer_id,
-                validator_id=None,
-                score=llm_validation.score,
-                is_correct=llm_validation.is_correct,
-                feedback=llm_validation.feedback,
-                created_at=llm_validation.created_at
-            )
-            
-        except ValueError as ve:
-            print(f"Errore di validazione: {str(ve)}")
-            print(f"Risposta LLM ricevuta: {llm_response}")
-            raise HTTPException(status_code=500, detail=f"Errore nel formato della risposta LLM: {str(ve)}")
-        except Exception as e:
-            print(f"Errore generico: {str(e)}")
-            print(f"Risposta LLM ricevuta: {llm_response}")
-            raise HTTPException(status_code=500, detail=f"Errore nell'elaborazione della risposta LLM: {str(e)}")
+
+        score = validation_data["score"]
+        
+        # Simula un feedback basato sul punteggio
+        feedback_text = f"Valutazione automatica: punteggio {score}/10."
+
+        llm_validation = LLMValidation(
+            answer_id=answer_to_validate.id,
+            score=score,
+            is_correct=score >= 6,  # Soglia di correttezza
+            feedback=feedback_text
+        )
+
+        db.add(llm_validation)
+        db.commit()
+        db.refresh(llm_validation)
+        
+        return ValidationResponse(
+            id=llm_validation.id,
+            answer_id=llm_validation.answer_id,
+            validator_id=None,  # Esplicitamente None per LLM
+            score=llm_validation.score,
+            is_correct=llm_validation.is_correct,
+            feedback=llm_validation.feedback,
+            created_at=llm_validation.created_at
+        )
+
+    # Valida la risposta umana
+    human_validation = validate_single_answer(human_answer, is_llm=False)
     
-    # Valida entrambe le risposte
-    validations.append(validate_single_answer(human_answer, False))
-    validations.append(validate_single_answer(llm_answer, True))
+    # Valida la risposta LLM
+    llm_validation = validate_single_answer(llm_answer, is_llm=True)
     
-    return validations
+    return [human_validation, llm_validation]
 
 @router.get("/validated-tags/me", response_model=ValidatedTagResponseList)
 async def get_my_validated_tags(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
@@ -405,75 +350,45 @@ async def validate_with_llm_text(
     Valida una risposta arbitraria (non presente nel DB) e una risposta LLM generata al volo.
     Restituisce una lista di 2 ValidationResponse (mock, senza DB).
     """
-    # Funzione helper per validare una singola risposta
-    def validate_single_answer(answer_text, is_llm=False):
-        prompt = f"""
-        Valuta la seguente risposta a una domanda sulla cultura italiana,sei un esperto di cultura italiana.
-        Non ti fare problemi a dare voti molto bassi se ritieni la risposta sbagliata o non pertinente.
-        Domanda: {question_text}
-        Tema: {theme}
-        Risposta da valutare: {answer_text}
-        Tipo risposta: {'LLM' if is_llm else 'Umana'}
+    # Funzione helper per validare un testo arbitrario
+    def validate_single_answer_text(answer_text_to_validate: str, question_text: str, theme: str) -> Optional[ValidationResponse]:
+        validation_data = llm_service.validate_answer(
+            question=question_text,
+            answer=answer_text_to_validate,
+            feedback=""
+        )
+
+        if not validation_data or "score" not in validation_data:
+            return None # Gestisce l'errore in modo silente
+
+        score = validation_data["score"]
+        feedback_text = f"Valutazione automatica: punteggio {score}/10."
         
-        Valuta la risposta considerando:
-        1. Correttezza (accuratezza delle informazioni)
-        2. Rilevanza (pertinenza rispetto alla domanda)
-        3. Dettaglio (completezza della risposta)
-        4. Chiarezza (comprensibilità e struttura)
-        
-        Fornisci:
-        1. Un punteggio da 0 a 10 per ogni criterio (0 = completamente sbagliato/inappropriato)
-        2. Un punteggio complessivo da 0 a 10
-        3. Un breve feedback che spieghi la valutazione
-        
-        Formato di risposta richiesto:
-        Correttezza: [0-10]
-        Rilevanza: [0-10]
-        Dettaglio: [0-10]
-        Chiarezza: [0-10]
-        Punteggio complessivo: [0-10]
-        Feedback: [breve spiegazione]
-        Non usare markdown o formattazioni particolari.
-        Rispetta esattamente il formato richiesto. Non sono ammessi errori.
-        Riporta quindi correttezza, rilevanza, dettaglio, chiarezza, punteggio complessivo e feedback.
-        """
-        llm_response = llm_service.generate_answer(prompt)
-        try:
-            lines = [line.strip() for line in llm_response.split('\n') if line.strip()]
-            score_lines = [line for line in lines if 'Punteggio complessivo:' in line]
-            if not score_lines:
-                raise ValueError("Formato risposta non valido: manca il punteggio complessivo")
-            score_str = score_lines[0].split(':')[1].strip()
-            match = re.search(r'([0-9]|10)', score_str)
-            if not match:
-                raise ValueError(f"Punteggio non valido nel testo: {score_str}")
-            score = float(match.group(1))
-            feedback_lines = [line for line in lines if 'Feedback:' in line]
-            if not feedback_lines:
-                raise ValueError("Formato risposta non valido: manca il feedback")
-            feedback = feedback_lines[0].split(':')[1].strip()
-            if not feedback:
-                feedback = "Nessun feedback fornito"
-            llm_validation = LLMValidation(
-                answer_id=0,
-                score=score,  # Non serve più normalizzare
-                is_correct=score >= 6,
-                feedback=feedback
-            )
-            return ValidationResponse(
-                id=0,
-                answer_id=0,
-                validator_id=None,
-                score=llm_validation.score,
-                is_correct=llm_validation.is_correct,
-                feedback=llm_validation.feedback,
-                created_at=None
-            )
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Errore nel parsing della risposta LLM: {str(e)}")
-    # Genera una risposta LLM per la stessa domanda
+        # Crea un oggetto mock di ValidationResponse perché non c'è interazione con il DB
+        return ValidationResponse(
+            id=0,  # ID fittizio
+            answer_id=0,
+            validator_id=None,
+            score=score,
+            is_correct=score >= 6,
+            feedback=feedback_text,
+            created_at=func.now() # Data corrente
+        )
+
+    # Validazione della risposta utente
+    user_validation = validate_single_answer_text(answer_text, question_text, theme)
+    
+    # Generazione e validazione della risposta LLM
     llm_generated_answer = llm_service.generate_answer(question_text, theme)
-    return [
-        validate_single_answer(answer_text, is_llm=False),
-        validate_single_answer(llm_generated_answer, is_llm=True)
-    ]
+    llm_validation = validate_single_answer_text(llm_generated_answer, question_text, theme)
+    
+    # Filtra i risultati per escludere eventuali validazioni fallite
+    results = [res for res in [user_validation, llm_validation] if res is not None]
+
+    if not results:
+        raise HTTPException(
+            status_code=500,
+            detail="Impossibile ottenere la validazione da servizio esterno."
+        )
+
+    return results

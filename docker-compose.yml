@@ -83,9 +83,6 @@ services:
       - DATABASE_URL=mysql+pymysql://culturallm_user:culturallm_pass@mariadb:3306/culturallm
       - SAGEMAKER_ENDPOINT_NAME=jumpstart-dft-hf-llm-gemma-2-2b-20250702-143618
       - AWS_REGION=eu-north-1
-    env_file:
-      - ./backend/.env
-      # - AWS_SESSION_TOKEN=YOUR_AWS_SESSION_TOKEN # DecCommenta se usi credenziali temporanee
     networks:
       - culturallm_network
     healthcheck:
