@@ -122,5 +122,4 @@ networks:
 volumes:
   # Volume per i dati del database
   culturallm_mariadb_data:
-    name: culturallm_mariadb_data
-    driver: local
+    external: true

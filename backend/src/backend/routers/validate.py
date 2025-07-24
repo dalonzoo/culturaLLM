@@ -282,9 +282,7 @@ async def validate_with_llm(
             )
 
         score = validation_data["score"]
-        
-        # Simula un feedback basato sul punteggio
-        feedback_text = f"Valutazione automatica: punteggio {score}/10."
+        feedback_text = validation_data.get("feedback", f"Valutazione automatica: punteggio {score}/10.")
 
         llm_validation = LLMValidation(
             answer_id=answer_to_validate.id,

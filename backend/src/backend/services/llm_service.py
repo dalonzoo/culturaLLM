@@ -42,7 +42,7 @@ class LLMService:
         endpoint_url = f"{self.modal_app_url}/tasks/cyan"
         payload = {
             "argomento": question,
-            "livello": "3"  # Livello medio come richiesto
+            "livello": "1"  # Livello medio come richiesto
         }
         headers = {"Content-Type": "application/json"}
 
@@ -111,25 +111,32 @@ class LLMService:
     def validate_answer(self, question: str, answer: str, feedback: str = "") -> Optional[Dict]:
         """
         Valuta una risposta utilizzando il servizio esterno.
+        Usa l'endpoint green_validity.
         Args:
             question: La domanda originale.
             answer: La risposta da valutare.
-            feedback: Un eventuale feedback (opzionale).
+            feedback: Ignorato per questo endpoint.
         Returns:
             Un dizionario con i dati della validazione, o None in caso di errore.
         """
-        endpoint_url = f"{self.modal_app_url}/tasks/red"
+        endpoint_url = f"{self.modal_app_url}/tasks/green_validity"
         payload = {
             "question": question,
-            "answer": answer,
-            "feedback": feedback or "Nessun feedback"  # Invia un placeholder se il feedback è vuoto
+            "answer": answer
         }
         headers = {"Content-Type": "application/json"}
         
         try:
+            print(f"[VALIDATE][SEND] Endpoint: {endpoint_url}\nPayload: {payload}")
             response = requests.post(endpoint_url, headers=headers, json=payload, timeout=30)
             response.raise_for_status()
-            return response.json()
+            data = response.json()
+            print(f"[VALIDATE][RECV] Response: {data}")
+            # Il formato atteso è: {"raw": ..., "score": ..., "feedback": ...}
+            return {
+                "score": data.get("score", 0),
+                "feedback": data.get("feedback", "")
+            }
         except requests.exceptions.RequestException as e:
             print(f"Error calling Modal endpoint for answer validation: {e}")
             return None
