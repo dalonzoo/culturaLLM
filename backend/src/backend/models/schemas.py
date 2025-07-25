@@ -71,7 +71,7 @@ class Validation(Base):
     id = Column(Integer, primary_key=True, index=True)
     answer_id = Column(Integer, ForeignKey("answers.id"), nullable=False)
     validator_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    score = Column(Float, nullable=False)  # 0-10 score
+    score = Column(Float, nullable=False)  # 1-5 score
     is_correct = Column(Boolean, nullable=False)
     feedback = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -84,7 +84,7 @@ class LLMValidation(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     answer_id = Column(Integer, ForeignKey("answers.id"), nullable=False)
-    score = Column(Float, nullable=False)  # 0-10 score
+    score = Column(Float, nullable=False)  # 1-5 score
     is_correct = Column(Boolean, nullable=False)
     feedback = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -139,6 +139,7 @@ class CulturalThemeResponse(BaseModel):
 class QuestionCreate(BaseModel):
     text: str
     theme_id: int
+    tag: Optional[str] = None  # Campo opzionale per il tag
 
 class QuestionResponse(BaseModel):
     id: int

@@ -2,9 +2,9 @@ import React, { useEffect, useState } from "react";
 import api from "../services/api";
 
 function scoreColor(score) {
-  if (score >= 8) return "#4CAF50"; // verde
-  if (score >= 6) return "#80cc33";
-  if (score >= 4) return "#ffa64d";
+  if (score >= 4.5) return "#4CAF50"; // verde
+  if (score >= 4) return "#80cc33";
+  if (score >= 3) return "#ffa64d";
   if (score >= 2) return "#ff4d4d";
   return "#ff1a1a";
 }
@@ -19,7 +19,7 @@ function ScoreBadge({ score }) {
       className="score-badge"
       style={{ backgroundColor: scoreColor(score), color: "#fff", padding: "0.3em 0.8em", borderRadius: "1em", fontWeight: 600 }}
     >
-      {score.toFixed(1)}
+      {score.toFixed(1)}/5
     </span>
   );
 }

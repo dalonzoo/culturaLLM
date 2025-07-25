@@ -16,9 +16,9 @@ function ValidateAnswers() {
   const [pendingAnswers, setPendingAnswers] = useState([])
   const [currentAnswerIndex, setCurrentAnswerIndex] = useState(0)
   const [validation, setValidation] = useState({
-    human_score: 5.5,
+    human_score: 3,
     human_feedback: "",
-    llm_score: 5.5,
+    llm_score: 3,
     llm_feedback: "",
   })
   const [loading, setLoading] = useState(false)
@@ -57,18 +57,18 @@ function ValidateAnswers() {
   }
 
   const getQualitativeScore = (score) => {
-    if (score <= 2) return "Completamente sbagliata";
-    if (score <= 4) return "Insufficiente";
-    if (score <= 6) return "Parzialmente corretta";
-    if (score <= 8) return "Buona risposta";
+    if (score <= 1) return "Completamente sbagliata";
+    if (score <= 2) return "Insufficiente";
+    if (score <= 3) return "Parzialmente corretta";
+    if (score <= 4) return "Buona risposta";
     return "Risposta eccellente";
   }
 
   const getScoreColor = (score) => {
-    if (score <= 2) return '#ff1a1a';
-    if (score <= 4) return '#ff4d4d';
-    if (score <= 6) return '#ffa64d';
-    if (score <= 8) return '#80cc33';
+    if (score <= 1) return '#ff1a1a';
+    if (score <= 2) return '#ff4d4d';
+    if (score <= 3) return '#ffa64d';
+    if (score <= 4) return '#80cc33';
     return '#4CAF50';
   }
 
@@ -87,9 +87,9 @@ function ValidateAnswers() {
 
     // Reset validation form
     setValidation({
-      human_score: 5.5,
+      human_score: 3,
       human_feedback: "",
-      llm_score: 5.5,
+      llm_score: 3,
       llm_feedback: "",
     })
   }
@@ -111,7 +111,7 @@ function ValidateAnswers() {
       await api.post("/api/validate/", {
         answer_id: currentAnswer.answer.id,
         score: Number.parseFloat(validation.human_score),
-        is_correct: Number.parseFloat(validation.human_score) >= 6,
+        is_correct: Number.parseFloat(validation.human_score) >= 4,
         feedback: validation.human_feedback,
       })
 
@@ -157,9 +157,9 @@ function ValidateAnswers() {
       setCurrentAnswerIndex(0)
     }
     setValidation({
-      human_score: 5.5,
+      human_score: 3,
       human_feedback: "",
-      llm_score: 5.5,
+      llm_score: 3,
       llm_feedback: "",
     })
     setError("")
@@ -215,8 +215,8 @@ function ValidateAnswers() {
                     <h4>Risposta 1</h4>
                     <div className="validation-score">
                       <span className="score-label">Punteggio:</span>
-                      <span className={`score-value ${llmValidation.human.score >= 6 ? 'correct' : 'incorrect'}`}>
-                        {llmValidation.human.score.toFixed(1)}/10
+                      <span className={`score-value ${llmValidation.human.score >= 4 ? 'correct' : 'incorrect'}`}>
+                        {llmValidation.human.score.toFixed(1)}/5
                       </span>
                     </div>
                     <div className="validation-feedback">
@@ -231,8 +231,8 @@ function ValidateAnswers() {
                     <h4>Risposta 2</h4>
                     <div className="validation-score">
                       <span className="score-label">Punteggio:</span>
-                      <span className={`score-value ${llmValidation.llm.score >= 6 ? 'correct' : 'incorrect'}`}>
-                        {llmValidation.llm.score.toFixed(1)}/10
+                      <span className={`score-value ${llmValidation.llm.score >= 4 ? 'correct' : 'incorrect'}`}>
+                        {llmValidation.llm.score.toFixed(1)}/5
                       </span>
                     </div>
                     <div className="validation-feedback">
@@ -269,8 +269,8 @@ function ValidateAnswers() {
                       type="range"
                       id="human_score"
                       min="1"
-                      max="10"
-                      step="2.25"
+                      max="5"
+                      step="1"
                       value={validation.human_score}
                       onChange={(e) => setValidation({ ...validation, human_score: e.target.value })}
                       disabled={submitting}
@@ -278,12 +278,12 @@ function ValidateAnswers() {
                       style={{
                         background: `linear-gradient(to right, 
                           ${getScoreColor(validation.human_score)} 
-                          ${(validation.human_score - 1) * 11.11}%, 
-                          #ddd ${(validation.human_score - 1) * 11.11}%)`
+                          ${(validation.human_score - 1) * 25}%, 
+                          #ddd ${(validation.human_score - 1) * 25}%)`
                       }}
                     />
                     <div className="score-display">
-                      <div className={`validation-badge ${validation.human_score >= 6 ? 'correct' : 'incorrect'}`}
+                      <div className={`validation-badge ${validation.human_score >= 4 ? 'correct' : 'incorrect'}`}
                            style={{ backgroundColor: `${getScoreColor(validation.human_score)}20`,
                                    color: getScoreColor(validation.human_score),
                                    borderColor: `${getScoreColor(validation.human_score)}40` }}>
@@ -329,8 +329,8 @@ function ValidateAnswers() {
                         type="range"
                         id="llm_score"
                         min="1"
-                        max="10"
-                        step="2.25"
+                        max="5"
+                        step="1"
                         value={validation.llm_score}
                         onChange={(e) => setValidation({ ...validation, llm_score: e.target.value })}
                         disabled={submitting}
@@ -338,12 +338,12 @@ function ValidateAnswers() {
                         style={{
                           background: `linear-gradient(to right, 
                             ${getScoreColor(validation.llm_score)} 
-                            ${(validation.llm_score - 1) * 11.11}%, 
-                            #ddd ${(validation.llm_score - 1) * 11.11}%)`
+                            ${(validation.llm_score - 1) * 25}%, 
+                            #ddd ${(validation.llm_score - 1) * 25}%)`
                         }}
                       />
                       <div className="score-display">
-                        <div className={`validation-badge ${validation.llm_score >= 6 ? 'correct' : 'incorrect'}`}
+                        <div className={`validation-badge ${validation.llm_score >= 4 ? 'correct' : 'incorrect'}`}
                              style={{ backgroundColor: `${getScoreColor(validation.llm_score)}20`,
                                      color: getScoreColor(validation.llm_score),
                                      borderColor: `${getScoreColor(validation.llm_score)}40` }}>
@@ -454,15 +454,7 @@ function ValidateAnswers() {
           border-radius: 4px;
         }
 
-        .score-value.correct {
-          background-color: #e8f5e9;
-          color: #2e7d32;
-        }
-
-        .score-value.incorrect {
-          background-color: #ffebee;
-          color: #c62828;
-        }
+        
 
         .feedback-text {
           margin: 0.5rem 0;

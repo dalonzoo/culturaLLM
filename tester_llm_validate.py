@@ -51,8 +51,8 @@ def check_llm_format(validation):
     for field in required_fields:
         if field not in validation:
             return False, f"Campo mancante: {field}"
-    # Score deve essere float tra 0 e 10
-    if not (0 <= float(validation["score"]) <= 10):
+    # Score deve essere float tra 1 e 5
+    if not (1 <= float(validation["score"]) <= 5):
         return False, f"Score fuori range: {validation['score']}"
     # Feedback deve essere stringa non vuota
     if not isinstance(validation["feedback"], str) or not validation["feedback"]:

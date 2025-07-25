@@ -133,8 +133,12 @@ class LLMService:
             data = response.json()
             print(f"[VALIDATE][RECV] Response: {data}")
             # Il formato atteso è: {"raw": ..., "score": ..., "feedback": ...}
+            score = data.get("score", 0)
+            # Normalizza score su scala 1-5 se necessario
+            if score > 5:
+                score = round((score / 10) * 5, 2)  # Arrotonda a 2 decimali
             return {
-                "score": data.get("score", 0),
+                "score": score,
                 "feedback": data.get("feedback", "")
             }
         except requests.exceptions.RequestException as e:

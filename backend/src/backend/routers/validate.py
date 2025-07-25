@@ -309,7 +309,10 @@ async def validate_with_llm(
     # Valida la risposta umana
     human_validation = validate_single_answer(human_answer, is_llm=False)
     
-    return [human_validation]
+    # Valida la risposta LLM
+    llm_validation = validate_single_answer(llm_answer, is_llm=True)
+    
+    return [human_validation, llm_validation]
 
 @router.get("/validated-tags/me", response_model=ValidatedTagResponseList)
 async def get_my_validated_tags(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
