@@ -10,7 +10,7 @@ from backend.services.database import get_db
 from backend.models.schemas import (
     Validation, Answer, Question, User, LLMValidation,
     ValidationCreate, ValidationResponse, PendingValidationResponse, CulturalTheme,
-    QuestionModel, ValidatedTag, ValidatedTagResponse, ValidatedTagResponseList, Base
+    QuestionModel, Base
 )
 from backend.routers.auth import get_current_user
 from backend.services.llm_service import llm_service
@@ -49,17 +49,7 @@ def update_user_score(user_id: int, points: int, db: Session):
         user.badges = ",".join(filter(None, badges))
         db.commit()
 
-def save_validated_tag(user_id: int, question_id: int, tag: str, score: float, db: Session):
-    # Non salvare se il tag è None o vuoto
-    if not tag:
-        print(f"[WARN] Tag mancante per question_id={question_id}, user_id={user_id}. Non salvo validated_tag.")
-        return
-    # Cerca duplicati anche per tag e score
-    existing = db.query(ValidatedTag).filter_by(user_id=user_id, question_id=question_id, tag=tag, score=score).first()
-    if existing:
-        return  # Non salvare duplicati esatti
-    db.add(ValidatedTag(user_id=user_id, question_id=question_id, tag=tag, score=score))
-    db.commit()
+
 
 @router.post("/", response_model=ValidationResponse)
 async def create_validation(
@@ -128,13 +118,7 @@ async def create_validation(
     if answer.user_id and validation.is_correct and validation.score >= 4:
         update_user_score(answer.user_id, int(validation.score * 2), db)
     
-    question = db.query(Question).filter(Question.id == answer.question_id).first()
-    if question and question.tag:
-        # Salva per il validatore
-        save_validated_tag(current_user.id, question.id, question.tag, validation.score, db)
-        # Salva per il rispondente solo se diverso dal validatore e diverso dal creatore della domanda
-        if answer.user_id and answer.user_id != current_user.id and answer.user_id != question.creator_id:
-            save_validated_tag(answer.user_id, question.id, question.tag, validation.score, db)
+    
     
     return ValidationResponse.from_orm(db_validation)
 
@@ -314,30 +298,7 @@ async def validate_with_llm(
     
     return [human_validation, llm_validation]
 
-@router.get("/validated-tags/me", response_model=ValidatedTagResponseList)
-async def get_my_validated_tags(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """
-    Restituisce tutti i tag e punteggi delle domande validate dall'utente (come validatore).
-    """
-    # Prendi solo le validazioni dove l'utente è stato validatore
-    validated_questions = db.query(Validation.answer_id).filter(Validation.validator_id == current_user.id).subquery()
-    # Trova le domande associate a queste risposte
-    validated_question_ids = db.query(Answer.question_id).filter(Answer.id.in_(validated_questions)).distinct()
-    tags = db.query(ValidatedTag).filter(ValidatedTag.user_id == current_user.id, ValidatedTag.question_id.in_(validated_question_ids)).all()
-    return ValidatedTagResponseList(items=tags)
 
-@router.get("/validated-tags/by-answers", response_model=ValidatedTagResponseList)
-async def get_validated_tags_by_answers(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """
-    Restituisce tutti i tag e punteggi delle domande a cui l'utente ha risposto (solo i suoi).
-    """
-    # Trova tutte le domande a cui l'utente ha risposto
-    answered_questions = db.query(Answer.question_id).filter(Answer.user_id == current_user.id).distinct()
-    tags = db.query(ValidatedTag).filter(
-        ValidatedTag.user_id == current_user.id,
-        ValidatedTag.question_id.in_(answered_questions)
-    ).all()
-    return ValidatedTagResponseList(items=tags)
 
 @router.post("/llm-validate-text", response_model=List[ValidationResponse])
 async def validate_with_llm_text(
