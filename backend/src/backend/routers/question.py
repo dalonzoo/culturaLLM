@@ -63,20 +63,18 @@ async def create_question(
     if not theme:
         raise HTTPException(status_code=404, detail="Theme not found")
     
-    # Genera il tag utilizzando il nuovo servizio
-    tag_text = llm_service.generate_tag(question.text)
+    # Usa il tag fornito se presente, altrimenti genera
+    tag_text = question.tag if question.tag else llm_service.generate_tag(question.text)
     
     db_question = Question(
         text=question.text,
         creator_id=current_user.id,
         theme_id=question.theme_id,
-        tag=tag_text  # Salva il tag generato
+        tag=tag_text  # Salva il tag generato o fornito
     )
     db.add(db_question)
     db.commit()
     db.refresh(db_question)
-    # Generate LLM answer in background
-    background_tasks.add_task(generate_llm_answer_background, db_question.id, db)
     return QuestionResponse.from_orm(db_question)
 
 @router.get("/", response_model=List[QuestionResponse])
@@ -152,10 +150,9 @@ async def generate_llm_question(
         if not question_text:
             raise Exception("Risposta dell'endpoint non valida: manca 'question_generated'")
         
-        # Genera il tag per la nuova domanda
-        tag = llm_service.generate_tag(question_text.strip())
-        
-        return {"text": question_text.strip(), "tag": tag}
+        # Il tag non viene più generato qui per evitare duplicazioni.
+        # Verrà generato dall'endpoint `create_question` quando la domanda viene salvata.
+        return {"text": question_text.strip(), "tag": None}
         
     except requests.exceptions.RequestException as e:
         raise HTTPException(
