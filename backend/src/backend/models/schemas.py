@@ -91,15 +91,7 @@ class LLMValidation(Base):
     
     answer = relationship("Answer", back_populates="llm_validations")
 
-class ValidatedTag(Base):
-    __tablename__ = "validated_tags"
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    question_id = Column(Integer, ForeignKey("questions.id"), nullable=False)
-    tag = Column(String(100), nullable=False)
-    score = Column(Float, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    __table_args__ = (UniqueConstraint('user_id', 'question_id', name='_user_question_uc'),)
+
 
 # Pydantic Models
 class UserBase(BaseModel):
@@ -216,14 +208,4 @@ class QuestionModel(BaseModel):
 class TagResponse(BaseModel):
     tag: str
 
-class ValidatedTagResponse(BaseModel):
-    tag: str
-    score: float
-    question_id: int
-    user_id: int
-    created_at: datetime
-    class Config:
-        from_attributes = True
 
-class ValidatedTagResponseList(BaseModel):
-    items: list[ValidatedTagResponse]
