@@ -208,4 +208,18 @@ class QuestionModel(BaseModel):
 class TagResponse(BaseModel):
     tag: str
 
+class ValidatedTagEntry(BaseModel):
+    question_id: int
+    tag: Optional[str]
+    score: float
+    created_at: datetime
+    user_id: Optional[int] = None # ID dell'utente che ha risposto (se applicabile)
+    validator_id: Optional[int] = None # ID del validatore (se applicabile)
+
+    class Config:
+        from_attributes = True
+
+class ValidatedTagListResponse(BaseModel):
+    items: List[ValidatedTagEntry]
+
 

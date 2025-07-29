@@ -10,7 +10,7 @@ from backend.services.database import get_db
 from backend.models.schemas import (
     Validation, Answer, Question, User, LLMValidation,
     ValidationCreate, ValidationResponse, PendingValidationResponse, CulturalTheme,
-    QuestionModel, Base
+    QuestionModel, Base, ValidatedTagListResponse, ValidatedTagEntry
 )
 from backend.routers.auth import get_current_user
 from backend.services.llm_service import llm_service
@@ -299,6 +299,63 @@ async def validate_with_llm(
     return [human_validation, llm_validation]
 
 
+@router.get("/validated-tags/me", response_model=ValidatedTagListResponse)
+async def get_my_validated_tags(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Recupera i tag delle domande validate dall'utente corrente (come validatore).
+    """
+    validations = db.query(Validation).filter(
+        Validation.validator_id == current_user.id
+    ).all()
+
+    result = []
+    for val in validations:
+        answer = db.query(Answer).filter(Answer.id == val.answer_id).first()
+        if answer:
+            question = db.query(Question).filter(Question.id == answer.question_id).first()
+            if question:
+                result.append(ValidatedTagEntry(
+                    question_id=question.id,
+                    tag=question.tag,
+                    score=val.score,
+                    created_at=val.created_at,
+                    validator_id=current_user.id,
+                    user_id=answer.user_id
+                ))
+    return ValidatedTagListResponse(items=result)
+
+@router.get("/validated-tags/by-answers", response_model=ValidatedTagListResponse)
+async def get_validated_tags_by_my_answers(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Recupera i tag delle domande le cui risposte sono state validate (risposte create dall'utente corrente).
+    """
+    answers = db.query(Answer).filter(
+        Answer.user_id == current_user.id
+    ).all()
+
+    result = []
+    for ans in answers:
+        validations = db.query(Validation).filter(
+            Validation.answer_id == ans.id
+        ).all()
+        question = db.query(Question).filter(Question.id == ans.question_id).first()
+        if question:
+            for val in validations:
+                result.append(ValidatedTagEntry(
+                    question_id=question.id,
+                    tag=question.tag,
+                    score=val.score,
+                    created_at=val.created_at,
+                    user_id=current_user.id,
+                    validator_id=val.validator_id
+                ))
+    return ValidatedTagListResponse(items=result)
 
 @router.post("/llm-validate-text", response_model=List[ValidationResponse])
 async def validate_with_llm_text(
